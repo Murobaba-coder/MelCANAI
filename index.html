@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Melcan AI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💬%3C/text%3E%3C/svg%3E">
 <style>
 :root{
   box-sizing:border-box;
@@ -31,6 +32,8 @@ body{height:100%;margin:0;background:var(--bg);color:var(--ink);
 header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
 header h1{margin:0;font-size:1.25rem;font-weight:800}
 header span{color:var(--muted);font-size:.85rem}
+#theme{margin-left:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;width:38px;height:38px;font-size:1.1rem;cursor:pointer}
+#theme:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 #log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
 .msg{max-width:82%;padding:10px 14px;border-radius:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 .msg a{color:var(--link);font-weight:700}
@@ -50,7 +53,7 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
 </head>
 <body>
 <div class="app">
-  <header><h1>Melcan AI</h1><span>sohbet, bilgi, oyun, öğrenen bot</span></header>
+  <header><h1>Melcan AI</h1><span>sohbet, bilgi, oyun, öğrenen bot</span><button id="theme" type="button" aria-label="Açık/koyu tema">🌓</button></header>
   <div id="log" aria-live="polite"></div>
   <div class="quick" id="quick"></div>
   <form id="form">
@@ -90,7 +93,30 @@ const BASKENT={
  "polonya":["Polonya","Varşova"],"ukrayna":["Ukrayna","Kiev"],"irak":["Irak","Bağdat"],
  "iran":["İran","Tahran"],"kazakistan":["Kazakistan","Astana"],"guney kore":["Güney Kore","Seul"],
  "meksika":["Meksika","Mexico City"],"arjantin":["Arjantin","Buenos Aires"],"isvec":["İsveç","Stockholm"],
- "norvec":["Norveç","Oslo"]
+ "norvec":["Norveç","Oslo"],
+ "bulgaristan":["Bulgaristan","Sofya"],"romanya":["Romanya","Bükreş"],"gurcistan":["Gürcistan","Tiflis"],
+ "isvicre":["İsviçre","Bern"],"avusturya":["Avusturya","Viyana"],"belcika":["Belçika","Brüksel"],
+ "danimarka":["Danimarka","Kopenhag"],"finlandiya":["Finlandiya","Helsinki"],"cekya":["Çekya","Prag"],
+ "macaristan":["Macaristan","Budapeşte"],"hirvatistan":["Hırvatistan","Zagreb"],"sirbistan":["Sırbistan","Belgrad"],
+ "arnavutluk":["Arnavutluk","Tiran"],"kuzey makedonya":["Kuzey Makedonya","Üsküp"],"bosna hersek":["Bosna-Hersek","Saraybosna"],
+ "karadag":["Karadağ","Podgorica"],"kosova":["Kosova","Priştine"],"slovenya":["Slovenya","Ljubljana"],
+ "slovakya":["Slovakya","Bratislava"],"litvanya":["Litvanya","Vilnius"],"letonya":["Letonya","Riga"],
+ "estonya":["Estonya","Tallinn"],"belarus":["Belarus","Minsk"],"moldova":["Moldova","Kişinev"],
+ "ermenistan":["Ermenistan","Erivan"],"irlanda":["İrlanda","Dublin"],"izlanda":["İzlanda","Reykjavik"],
+ "suriye":["Suriye","Şam"],"lubnan":["Lübnan","Beyrut"],"urdun":["Ürdün","Amman"],"kuveyt":["Kuveyt","Kuveyt"],
+ "katar":["Katar","Doha"],"birlesik arap emirlikleri":["Birleşik Arap Emirlikleri","Abu Dabi"],"umman":["Umman","Maskat"],
+ "yemen":["Yemen","Sana"],"afganistan":["Afganistan","Kabil"],"pakistan":["Pakistan","İslamabad"],
+ "bangladesh":["Bangladeş","Dakka"],"nepal":["Nepal","Katmandu"],"tayland":["Tayland","Bangkok"],
+ "vietnam":["Vietnam","Hanoi"],"endonezya":["Endonezya","Cakarta"],"malezya":["Malezya","Kuala Lumpur"],
+ "filipinler":["Filipinler","Manila"],"singapur":["Singapur","Singapur"],"kuzey kore":["Kuzey Kore","Pyongyang"],
+ "mogolistan":["Moğolistan","Ulan Batur"],"ozbekistan":["Özbekistan","Taşkent"],"turkmenistan":["Türkmenistan","Aşkabat"],
+ "kirgizistan":["Kırgızistan","Bişkek"],"tacikistan":["Tacikistan","Duşanbe"],"cezayir":["Cezayir","Cezayir"],
+ "fas":["Fas","Rabat"],"tunus":["Tunus","Tunus"],"libya":["Libya","Trablus"],"sudan":["Sudan","Hartum"],
+ "etiyopya":["Etiyopya","Addis Ababa"],"kenya":["Kenya","Nairobi"],"nijerya":["Nijerya","Abuja"],"gana":["Gana","Accra"],
+ "guney afrika":["Güney Afrika","Pretoria"],"senegal":["Senegal","Dakar"],"somali":["Somali","Mogadişu"],
+ "kuba":["Küba","Havana"],"sili":["Şili","Santiago"],"kolombiya":["Kolombiya","Bogota"],"peru":["Peru","Lima"],
+ "venezuela":["Venezuela","Karakas"],"ekvador":["Ekvador","Quito"],"uruguay":["Uruguay","Montevideo"],
+ "paraguay":["Paraguay","Asunción"],"yeni zelanda":["Yeni Zelanda","Wellington"]
 };
 // [anahtar kelimeler (hepsi geçmeli), cevap]
 const BILGI=[
@@ -112,7 +138,59 @@ const BILGI=[
  [["haftada","kac gun"],"Bir haftada 7 gün var."],
  [["yilda","kac ay"],"Bir yılda 12 ay var."],
  [["en hizli","kara hayvan"],"Karadaki en hızlı hayvan çita."],
- [["en buyuk","hayvan"],"Dünyanın en büyük hayvanı mavi balina."]
+ [["en buyuk","hayvan"],"Dünyanın en büyük hayvanı mavi balina."],
+ [["en buyuk","kus"],"Dünyanın en büyük kuşu devekuşu."],
+ [["en hizli","kus"],"En hızlı kuş, dalış sırasında şahin (gökdoğan)."],
+ [["en yavas","hayvan"],"En yavaş hayvanlardan biri tembel hayvan (sloth)."],
+ [["gunes","en yakin","gezegen"],"Güneş'e en yakın gezegen Merkür."],
+ [["kizil","gezegen"],"Kızıl gezegen Mars."],
+ [["halka","gezegen"],"Halkalarıyla en ünlü gezegen Satürn."],
+ [["gezegen","sirala"],"Güneş'ten uzaklığa göre: Merkür, Venüs, Dünya, Mars, Jüpiter, Satürn, Uranüs, Neptün."],
+ [["kitalar"],"7 kıta: Asya, Afrika, Kuzey Amerika, Güney Amerika, Antarktika, Avrupa, Avustralya (Okyanusya)."],
+ [["en buyuk","kita"],"En büyük kıta Asya."],
+ [["en buyuk","ulke"],"Yüzölçümü en büyük ülke Rusya."],
+ [["en kalabalik","ulke"],"Dünyanın en kalabalık ülkesi artık Hindistan, Çin'i geçti."],
+ [["en uzun","nehir","turkiye"],"Türkiye'nin en uzun nehri Kızılırmak, yaklaşık 1355 km."],
+ [["en uzun","nehir"],"Dünyanın en uzun nehri Nil ya da Amazon, ölçüm yöntemine göre değişiyor."],
+ [["en derin","gol"],"Dünyanın en derin gölü Rusya'daki Baykal Gölü."],
+ [["en buyuk","col"],"En büyük sıcak çöl Sahra Çölü."],
+ [["isik","hizi"],"Işık saniyede yaklaşık 300.000 km yol alır."],
+ [["ay","dunya","uzaklik"],"Ay, Dünya'dan ortalama yaklaşık 384.000 km uzakta."],
+ [["gunes","dunya","uzaklik"],"Güneş, Dünya'dan yaklaşık 150 milyon km uzakta."],
+ [["kac","kemik"],"Yetişkin bir insanda 206 kemik var."],
+ [["kalp","kac","odacik"],"İnsan kalbinin 4 odacığı var: 2 kulakçık, 2 karıncık."],
+ [["su","formul"],"Suyun formülü H2O."],
+ [["en sert","madde"],"Doğadaki en sert madde elmas."],
+ [["altin","sembol"],"Altının sembolü Au."],
+ [["fotosentez"],"Fotosentezde bitkiler ışık, su ve karbondioksitten şeker ve oksijen üretir."],
+ [["pi","sayisi"],"Pi sayısı yaklaşık 3,14159."],
+ [["ucgen","aci","toplam"],"Bir üçgenin iç açıları toplamı 180 derece."],
+ [["en kucuk","asal"],"En küçük asal sayı 2."],
+ [["yer cekimi","kim"],"Yerçekimi yasasını Isaac Newton formüle etti."],
+ [["gorelilik","kim"],"Görelilik kuramını Albert Einstein geliştirdi."],
+ [["ampul","kim"],"Ampulü Thomas Edison geliştirdi."],
+ [["telefon","kim"],"Telefonun mucidi olarak Alexander Graham Bell biliniyor."],
+ [["ucak","kim"],"İlk motorlu uçuşu Wright kardeşler yaptı (1903)."],
+ [["romeo","juliet","kim"],"Romeo ve Juliet'i William Shakespeare yazdı."],
+ [["istiklal","marsi","yazar"],"İstiklal Marşı'nın şairi Mehmet Akif Ersoy."],
+ [["tbmm","acil"],"TBMM 23 Nisan 1920'de açıldı."],
+ [["zafer","bayram"],"Zafer Bayramı, Büyük Taarruz'un sonucu olan 30 Ağustos 1922 zaferini kutlar."],
+ [["ataturk","olum"],"Atatürk 10 Kasım 1938'de vefat etti."],
+ [["malazgirt"],"Malazgirt Savaşı 1071'de yapıldı."],
+ [["osmanli","kurucu"],"Osmanlı Devleti'nin kurucusu Osman Bey."],
+ [["kolomb"],"Kristof Kolomb Amerika kıtasına 1492'de ulaştı."],
+ [["fransiz","devrim"],"Fransız Devrimi 1789'da başladı."],
+ [["birinci","dunya","savas"],"Birinci Dünya Savaşı 1914-1918 arasında sürdü."],
+ [["ikinci","dunya","savas"],"İkinci Dünya Savaşı 1939-1945 arasında sürdü."],
+ [["kac","il","turkiye"],"Türkiye'de 81 il var."],
+ [["en kalabalik","sehir"],"Türkiye'nin en kalabalık şehri İstanbul."],
+ [["para","birim","turkiye"],"Türkiye'nin para birimi Türk lirası."],
+ [["turkiye","komsu"],"Türkiye'nin komşuları: Yunanistan, Bulgaristan, Gürcistan, Ermenistan, Azerbaycan (Nahçıvan), İran, Irak, Suriye."],
+ [["istanbul","plaka"],"İstanbul'un plaka kodu 34."],
+ [["ankara","plaka"],"Ankara'nın plaka kodu 06."],
+ [["piramit","nerede"],"Ünlü piramitler Mısır'da."],
+ [["eyfel"],"Eyfel Kulesi Paris'te."],
+ [["cin","seddi"],"Çin Seddi Çin'de."]
 ];
 
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -255,13 +333,23 @@ function gonder(metin){
     return;
   }
   const c=cevap(metin);
-  if(typeof c==="string") yaz(c,"ai"); else yaz(c.t,"ai",c.link);
+  const t=document.createElement("div"); t.className="msg ai"; t.textContent="…";
+  log.appendChild(t); log.scrollTop=log.scrollHeight;
+  setTimeout(()=>{ t.remove(); if(typeof c==="string") yaz(c,"ai"); else yaz(c.t,"ai",c.link); },450);
 }
 document.getElementById("form").addEventListener("submit",e=>{
   e.preventDefault();
   const i=document.getElementById("in"); const v=i.value.trim();
   if(!v) return; i.value=""; gonder(v);
 });
+const root=document.documentElement;
+try{ const tm=localStorage.getItem("melcan_tema"); if(tm) root.setAttribute("data-theme",tm); }catch(e){}
+document.getElementById("theme").onclick=()=>{
+  const cur=root.getAttribute("data-theme");
+  const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
+  const n=dark?"light":"dark"; root.setAttribute("data-theme",n);
+  try{ localStorage.setItem("melcan_tema",n); }catch(e){}
+};
 const q=document.getElementById("quick");
 [["🔢 Sayı oyunu","sayı oyunu"],["✊ Taş-kâğıt-makas","taş kağıt makas"],["😄 Fıkra","fıkra anlat"],["🧠 Öğrendiklerim","öğrendiklerim"],["🏠 Menü","menü"]]
 .forEach(([t,k])=>{
