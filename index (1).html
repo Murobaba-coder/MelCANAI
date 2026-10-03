@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Melcan AI</title>
+<style>
+:root{
+  box-sizing:border-box;
+  --bg:#f3f1fb; --panel:#ffffff; --ink:#1d1b2e; --muted:#6b6785;
+  --accent:#7c5cff; --accent-ink:#ffffff; --bubble-me:#7c5cff; --bubble-me-ink:#fff;
+  --bubble-ai:#e8e4f8; --line:#d9d4ee; --link:#4a2fd0;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1e1e2e; --panel:#2b2b3d; --ink:#f1effb; --muted:#a29fbd;
+    --bubble-ai:#37374f; --line:#3d3d58; --link:#b9a8ff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1e1e2e; --panel:#2b2b3d; --ink:#f1effb; --muted:#a29fbd;
+  --bubble-ai:#37374f; --line:#3d3d58; --link:#b9a8ff;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Nunito","Segoe UI",system-ui,sans-serif;display:flex;justify-content:center}
+.app{display:flex;flex-direction:column;width:100%;max-width:640px;height:100%}
+header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+header h1{margin:0;font-size:1.25rem;font-weight:800}
+header span{color:var(--muted);font-size:.85rem}
+#log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:82%;padding:10px 14px;border-radius:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg a{color:var(--link);font-weight:700}
+.me a{color:#fff}
+.ai{align-self:flex-start;background:var(--bubble-ai);border-bottom-left-radius:6px}
+.me{align-self:flex-end;background:var(--bubble-me);color:var(--bubble-me-ink);border-bottom-right-radius:6px}
+.quick{display:flex;gap:8px;padding:8px 16px;overflow-x:auto}
+.quick button{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  padding:8px 12px;border-radius:999px;font:inherit;font-size:.85rem;cursor:pointer}
+.quick button:focus-visible,#send:focus-visible,#in:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+form{display:flex;gap:8px;padding:8px 16px 14px}
+#in{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  border-radius:14px;padding:12px 14px;font:inherit;font-size:1rem}
+#send{border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:800;
+  padding:0 18px;border-radius:14px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Melcan AI</h1><span>sohbet, bilgi, oyun, öğrenen bot</span></header>
+  <div id="log" aria-live="polite"></div>
+  <div class="quick" id="quick"></div>
+  <form id="form">
+    <input id="in" autocomplete="off" placeholder="Bir mesaj yaz..." aria-label="Mesaj">
+    <button id="send" type="submit">Gönder</button>
+  </form>
+</div>
+<script>
+const GUNLER=["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+const FIKRALAR=[
+ "Temel sınıfta öğretmene sormuş: 'Hocam, hiç yapmadığım bir şey için ceza verir misiniz?' Öğretmen: 'Tabii ki hayır.' Temel: 'O zaman ödevimi yapmadım.'",
+ "Nasreddin Hoca göle maya çalıyormuş. Sormuşlar: 'Hocam ne yapıyorsun?' Hoca: 'Belki tutar da yoğurt olur.' 'Hiç göl yoğurt olur mu?' Hoca: 'Ya tutarsa?'",
+ "Bir adam doktora gitmiş: 'Doktor bey, kendimi çok unutkan hissediyorum.' Doktor: 'Ne zamandır?' Adam: 'Ne zamandır ne?'",
+ "Nasreddin Hoca eşeğini ararken üstüne binmiş. Komşu: 'Hocam, üstündeki ne?' Hoca: 'Biliyorum, ama arıyorum ya, o ayrı mesele!'"
+];
+const ONERILER=[
+ "Bir film ya da dizi izleyebilirsin.","Dışarı çıkıp biraz yürüyüş yapabilirsin.",
+ "Bir bulmaca çözmeyi dene.","Kitap okumak iyi gelir.",
+ "Yeni bir şey öğren, mesela bir dil ya da çizim.",
+ "Benimle sayı tahmin oyunu ya da taş-kâğıt-makas oynayabilirsin!"
+];
+const KISA={
+ "tamam":["Tamam!","Anlaştık!","Peki, başka bir şey ister misin?"],"ok":["Tamam!","Süper!"],
+ "evet":["Güzel!","Anladım!"],"hayir":["Tamam, peki."],"haha":["Güldüğüne sevindim!","Hehe 😄"],
+ "super":["Sevindim!"],"harika":["Teşekkürler!"],"guzel":["Teşekkürler!"],
+ "gunaydin":["Günaydın! Umarım güzel bir gün geçirirsin."],"iyi geceler":["İyi geceler, tatlı rüyalar!"],
+ "gorusuruz":["Görüşürüz, kendine iyi bak!"]
+};
+const BASKENT={
+ "turkiye":["Türkiye","Ankara"],"almanya":["Almanya","Berlin"],"fransa":["Fransa","Paris"],
+ "ingiltere":["İngiltere","Londra"],"italya":["İtalya","Roma"],"ispanya":["İspanya","Madrid"],
+ "japonya":["Japonya","Tokyo"],"cin":["Çin","Pekin"],"rusya":["Rusya","Moskova"],
+ "abd":["ABD","Washington D.C."],"amerika":["ABD","Washington D.C."],"azerbaycan":["Azerbaycan","Bakü"],
+ "yunanistan":["Yunanistan","Atina"],"misir":["Mısır","Kahire"],"suudi arabistan":["Suudi Arabistan","Riyad"],
+ "hindistan":["Hindistan","Yeni Delhi"],"brezilya":["Brezilya","Brasilia"],"kanada":["Kanada","Ottawa"],
+ "avustralya":["Avustralya","Canberra"],"portekiz":["Portekiz","Lizbon"],"hollanda":["Hollanda","Amsterdam"],
+ "polonya":["Polonya","Varşova"],"ukrayna":["Ukrayna","Kiev"],"irak":["Irak","Bağdat"],
+ "iran":["İran","Tahran"],"kazakistan":["Kazakistan","Astana"],"guney kore":["Güney Kore","Seul"],
+ "meksika":["Meksika","Mexico City"],"arjantin":["Arjantin","Buenos Aires"],"isvec":["İsveç","Stockholm"],
+ "norvec":["Norveç","Oslo"]
+};
+// [anahtar kelimeler (hepsi geçmeli), cevap]
+const BILGI=[
+ [["en buyuk","gezegen"],"Güneş Sistemi'nin en büyük gezegeni Jüpiter."],
+ [["kac","gezegen"],"Güneş Sistemi'nde 8 gezegen var."],
+ [["kac","kita"],"Dünya'da 7 kıta var."],
+ [["en buyuk","okyanus"],"En büyük okyanus Pasifik (Büyük) Okyanusu."],
+ [["en yuksek","dag"],"Dünyanın en yüksek dağı Everest, yaklaşık 8849 metre."],
+ [["turkiye","en yuksek","dag"],"Türkiye'nin en yüksek dağı Ağrı Dağı, yaklaşık 5137 metre."],
+ [["en buyuk","golu"],"Türkiye'nin en büyük gölü Van Gölü."],
+ [["cumhuriyet","ilan"],"Türkiye Cumhuriyeti 29 Ekim 1923'te ilan edildi."],
+ [["ataturk","dogdu"],"Atatürk 1881'de Selanik'te doğdu."],
+ [["istanbul","fetih"],"İstanbul 1453'te Fatih Sultan Mehmet tarafından fethedildi."],
+ [["mona lisa"],"Mona Lisa'yı Leonardo da Vinci yaptı."],
+ [["aya","ilk","ayak"],"Aya ilk ayak basan insan Neil Armstrong, 1969'da."],
+ [["su","kac derece","kaynar"],"Su deniz seviyesinde 100 derecede kaynar."],
+ [["su","kac derece","donar"],"Su deniz seviyesinde 0 derecede donar."],
+ [["dunya","gunes","dolanir"],"Dünya Güneş'in etrafında yaklaşık 365 günde bir tur atar."],
+ [["haftada","kac gun"],"Bir haftada 7 gün var."],
+ [["yilda","kac ay"],"Bir yılda 12 ay var."],
+ [["en hizli","kara hayvan"],"Karadaki en hızlı hayvan çita."],
+ [["en buyuk","hayvan"],"Dünyanın en büyük hayvanı mavi balina."]
+];
+
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const norm=s=>s.toLocaleLowerCase("tr").replace(/[ıİ]/g,"i").replace(/ş/g,"s").replace(/ğ/g,"g")
+  .replace(/ü/g,"u").replace(/ö/g,"o").replace(/ç/g,"c").replace(/[âä]/g,"a").replace(/[î]/g,"i")
+  .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+function lev(a,b){
+  if(Math.abs(a.length-b.length)>2) return 9;
+  const d=[];for(let i=0;i<=a.length;i++){d[i]=[i];}
+  for(let j=1;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[a.length][b.length];
+}
+// m: normalleştirilmiş mesaj. Kelime başı eşleşir, yazım hatasını da affeder.
+function has(m,key){
+  if((" "+m).includes(" "+key)) return true;
+  if(key.includes(" ")||key.length<4) return false;
+  const tol=key.length>=7?2:1;
+  return m.split(" ").some(w=>w.length>=3&&lev(w,key)<=tol);
+}
+const hasAny=(m,keys)=>keys.some(k=>has(m,k));
+
+const L={get(){try{return JSON.parse(localStorage.getItem("melcan_ogrendi")||"{}");}catch(e){return {};}},
+  set(o){try{localStorage.setItem("melcan_ogrendi",JSON.stringify(o));}catch(e){}}};
+let isim="";
+try{ isim=localStorage.getItem("melcan_isim")||""; }catch(e){}
+let bekleIsim=!isim;
+let sonKonu="",mod="",sayi=0,hak=0,benP=0,onP=0,bekleyenSoru="";
+const log=document.getElementById("log");
+function yaz(metin,kim,link){
+  const d=document.createElement("div");
+  d.className="msg "+kim; d.textContent=metin;
+  if(link){
+    d.appendChild(document.createTextNode("\n"));
+    const a=document.createElement("a"); a.href=link.url; a.target="_blank"; a.rel="noopener";
+    a.textContent=link.text; d.appendChild(a);
+  }
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+}
+function hesapla(raw){
+  const r=raw.toLowerCase().replace(/,/g,".").match(/^\s*(-?\d+(?:\.\d+)?)\s*([+\-*x\/])\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if(!r) return null;
+  const a=parseFloat(r[1]),b=parseFloat(r[3]); let s;
+  if(r[2]==="+") s=a+b; else if(r[2]==="-") s=a-b; else if(r[2]==="/"){ if(b===0) return "Sıfıra bölemem!"; s=a/b; } else s=a*b;
+  return "Sonuç = "+(Math.round(s*1e10)/1e10);
+}
+function sayiCevap(m){
+  if(!/^\d+$/.test(m)) return "Lütfen bir sayı yaz. (Çıkmak için 'menü' yaz)";
+  const t=parseInt(m,10); hak++;
+  if(t<sayi) return "Daha büyük bir sayı söyle.";
+  if(t>sayi) return "Daha küçük bir sayı söyle.";
+  mod=""; return "Tebrikler! "+hak+" denemede buldun! 🎉";
+}
+function tkmCevap(m){
+  if(["kagit","kagıt"].includes(m)) m="kagit";
+  const s=["tas","kagit","makas"], ad={tas:"taş",kagit:"kağıt",makas:"makas"};
+  if(!s.includes(m)) return "Taş, kağıt ya da makas yazmalısın. (Çıkmak için 'menü' yaz)";
+  const b=pick(s); let r="Ben "+ad[b]+" seçtim. ";
+  if(m===b) r+="Berabere!";
+  else if((m==="tas"&&b==="makas")||(m==="kagit"&&b==="tas")||(m==="makas"&&b==="kagit")){benP++;r+="Sen kazandın!";}
+  else {onP++;r+="Ben kazandım!";}
+  return r+"\nSkor: Sen "+benP+" - Ben "+onP;
+}
+function cevap(raw){
+  const m=norm(raw);
+  const cikis=["menu","cik","vazgec","iptal"].includes(m);
+
+  if(mod==="ogret"){
+    mod="";
+    if(cikis){ bekleyenSoru=""; return "Tamam, vazgeçtik."; }
+    const o=L.get(); o[bekleyenSoru]=raw.trim().slice(0,300);
+    const keys=Object.keys(o); if(keys.length>200) delete o[keys[0]];
+    L.set(o); bekleyenSoru="";
+    return "Teşekkürler, öğrendim! Bir daha sorarsan cevaplayacağım. 🧠";
+  }
+  if(mod){
+    if(cikis){
+      const son=mod==="tkm"?"Final skoru: Sen "+benP+" - Ben "+onP+". ":"";
+      mod=""; return son+"Oyundan çıktık, sohbete devam edebiliriz.";
+    }
+    return mod==="sayi"?sayiCevap(m):tkmCevap(m);
+  }
+  if(has(m,"sayi")&&hasAny(m,["oyun","tahmin"])){
+    mod="sayi"; sayi=1+Math.floor(Math.random()*100); hak=0;
+    return "1 ile 100 arasında bir sayı tuttum, bul bakalım! (Çıkmak için 'menü' yaz)";
+  }
+  if(hasAny(m,["makas","tas kagit"])){
+    mod="tkm"; benP=0; onP=0;
+    return "Taş-kâğıt-makas! Taş, kağıt ya da makas yaz. (Çıkmak için 'menü' yaz)";
+  }
+  const h=hesapla(raw); if(h) return h;
+
+  // Öğrendiklerimle ilgili komutlar
+  if(has(m,"ogrendiklerim")&&hasAny(m,["sil","unut"])){ L.set({}); return "Öğrendiğim her şeyi unuttum."; }
+  if(has(m,"ogrendiklerim")){
+    const o=L.get(),k=Object.keys(o);
+    return k.length?"Öğrendiklerim:\n"+k.slice(-10).map(x=>"• "+x+" → "+o[x]).join("\n"):"Henüz bana bir şey öğretmedin.";
+  }
+  if(KISA[m]) return pick(KISA[m]);
+  if(["baska","baska var mi","devam","ne gibi","bir tane daha"].includes(m)){
+    if(sonKonu==="oneri") return pick(ONERILER);
+    if(sonKonu==="fikra") return pick(FIKRALAR);
+  }
+  // Başkent soruları
+  if(has(m,"baskent")){
+    for(const k in BASKENT) if((" "+m).includes(" "+k)) return BASKENT[k][0]+"'nin başkenti "+BASKENT[k][1]+".";
+  }
+  // Önce sana öğretilenler
+  const o=L.get();
+  for(const q in o) if(q===m||lev(q,m)<=Math.floor(q.length/6)) return o[q];
+
+  if(hasAny(m,["merhaba","selam","slm"])) return "Selam "+isim+"! Nasılsın?";
+  if(has(m,"nasilsin")) return "İyiyim, teşekkürler! Sen nasılsın?";
+  if(hasAny(m,["iyiyim","harikayim"])) return "Buna sevindim!";
+  if(hasAny(m,["adin ne","kimsin"])) return "Ben Melcan AI! Seninle sohbet etmek için buradayım.";
+  if(has(m,"adim ne")||m==="beni taniyor musun") return "Senin adın "+isim+"!";
+  if(has(m,"saat")) return "Saat şu an "+new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
+  if(hasAny(m,["tarih","hangi gun","bugun gunlerden"])){
+    const d=new Date(); return "Bugün "+d.toLocaleDateString("tr-TR")+", "+GUNLER[d.getDay()]+".";
+  }
+  if(has(m,"fikra")){ sonKonu="fikra"; return pick(FIKRALAR)+"\n(Bir tane daha için 'başka' yaz.)"; }
+  if(hasAny(m,["ne yapsam","sikildim","canim sikildi"])){
+    sonKonu="oneri"; return pick(ONERILER)+"\n(Başka öneri için 'başka' yaz.)";
+  }
+  if(hasAny(m,["tesekkur","sagol"])) return "Rica ederim!";
+  for(const [keys,ans] of BILGI) if(keys.every(k=>(m.includes(k)||k.split(" ").every(w=>has(m,w))))) return ans;
+
+  // Bilmiyorum: öğrenmeyi teklif et
+  mod="ogret"; bekleyenSoru=m;
+  return {t:"Bunu bilmiyorum. Cevabı sen öğretir misin? Yazdığın cevabı hatırlarım. (Vazgeçmek için 'vazgeç' yaz)",
+    link:{text:"🔎 Google'da ara",url:"https://www.google.com/search?q="+encodeURIComponent(raw.trim())}};
+}
+function gonder(metin){
+  yaz(metin,"me");
+  if(bekleIsim){
+    isim=metin.trim().slice(0,30)||"Dost"; bekleIsim=false;
+    try{ localStorage.setItem("melcan_isim",isim); }catch(e){}
+    yaz("Memnun oldum "+isim+"! 'Türkiye'nin başkenti', 'fıkra anlat' ya da '5 + 3' yazabilirsin. Bilmediğim bir şeyi bana öğretebilirsin.","ai");
+    return;
+  }
+  const c=cevap(metin);
+  if(typeof c==="string") yaz(c,"ai"); else yaz(c.t,"ai",c.link);
+}
+document.getElementById("form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const i=document.getElementById("in"); const v=i.value.trim();
+  if(!v) return; i.value=""; gonder(v);
+});
+const q=document.getElementById("quick");
+[["🔢 Sayı oyunu","sayı oyunu"],["✊ Taş-kâğıt-makas","taş kağıt makas"],["😄 Fıkra","fıkra anlat"],["🧠 Öğrendiklerim","öğrendiklerim"],["🏠 Menü","menü"]]
+.forEach(([t,k])=>{
+  const b=document.createElement("button"); b.type="button"; b.textContent=t;
+  b.onclick=()=>{ if(!bekleIsim) gonder(k); }; q.appendChild(b);
+});
+yaz(bekleIsim?"Merhaba! Ben Melcan AI. Senin adın ne?":"Merhaba "+isim+"! Bana 'Almanya'nın başkenti', 'fıkra anlat' ya da '5+3' yazabilirsin. Bilmediğim şeyleri bana öğretebilirsin.","ai");
+</script>
+</body>
+</html>
