@@ -126,7 +126,7 @@ document.getElementById("api-btn").onclick = () => {
 };
 
 async function askGemini(promptText, key) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
   
   const sistemKarakteri = `Senin adın MelCANAI. Mehmet Ali Şanal tarafından yaratıldın.
   Sıradan bir yapay zeka gibi davranma. 
