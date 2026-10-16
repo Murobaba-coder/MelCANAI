@@ -109,12 +109,14 @@ let sonKonu="",mod="",sayi=0,hak=0,benP=0,onP=0,bekleyenSoru="";
 const log=document.getElementById("log");
 
 let apiKey = "";
+let calisanModel = "";
 try { apiKey = localStorage.getItem("melcan_apikey") || ""; } catch(e) {}
 
 document.getElementById("api-btn").onclick = () => {
   const key = prompt("Google Gemini API Anahtarınızı girin:\n(Anahtar sadece bu tarayıcıda yerel olarak saklanır.)", apiKey);
   if (key !== null) {
     apiKey = key.trim();
+    calisanModel = "";
     if (apiKey) {
       localStorage.setItem("melcan_apikey", apiKey);
       alert("API Anahtarı eklendi! Gerçek yapay zeka devrede.");
@@ -126,27 +128,76 @@ document.getElementById("api-btn").onclick = () => {
 };
 
 async function askGemini(promptText, key) {
-  // Senin isteğin üzerine doğrudan en zeki sürüm olan PRO modeline geçtik
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`;
-  
   const sistemKarakteri = `Senin adın MelCANAI. Kurucun ve geliştiricin Mehmet Ali Şanal'dır.
   Moleküler Biyoloji, Genetik ve biyoteknoloji alanlarında ileri düzey bir asistansın.
   Özellikle biyosensör teknolojileri, elektroaktif bakteriler (Shewanella oneidensis MR-1) ve mikrobiyal yakıt hücreleri konularında derin analitik bilgiye sahipsin.
   TEKNOFEST gibi inovasyon yarışmalarında ve AetherSense gibi proje geliştirme süreçlerinde kurucuna teknik araştırma desteği sağlarsın.
   Cevapların daima doğrudan, net, profesyonel ve akademik olmalıdır. Kendini hiçbir koşulda Google veya Gemini olarak tanıtma.`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: sistemKarakteri }] },
-      contents: [{ parts: [{ text: promptText }] }]
-    })
-  });
-  
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "Bilinmeyen API Hatası");
-  return data.candidates[0].content.parts[0].text;
+  let denenecekModeller = [];
+
+  if (calisanModel) {
+    denenecekModeller = [calisanModel];
+  } else {
+    // Google sunucusundan bu API anahtarına açık olan güncel modelleri çekiyoruz
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    const listData = await listRes.json();
+    if (!listRes.ok) throw new Error(listData.error?.message || "API Anahtarı doğrulanamadı.");
+
+    const uygunModeller = (listData.models || [])
+      .filter(m => 
+        m.name.includes("gemini") && 
+        !m.name.includes("tts") && 
+        !m.name.includes("image") && 
+        !m.name.includes("vision") && 
+        !m.name.includes("embedding") && 
+        m.supportedGenerationMethods?.includes("generateContent")
+      )
+      .map(m => m.name);
+
+    // En üst seviye modellerden başlayarak sırala
+    const siralama = [
+      ...uygunModeller.filter(m => m.includes("2.5-pro")),
+      ...uygunModeller.filter(m => m.includes("2.5-flash")),
+      ...uygunModeller.filter(m => m.includes("2.0-flash")),
+      ...uygunModeller.filter(m => m.includes("pro")),
+      ...uygunModeller.filter(m => m.includes("flash")),
+      ...uygunModeller
+    ];
+    denenecekModeller = [...new Set(siralama)];
+  }
+
+  if (denenecekModeller.length === 0) {
+    throw new Error("Hesabınızda kullanılabilir aktif bir model bulunamadı.");
+  }
+
+  let sonHata = "";
+  for (const modelAdi of denenecekModeller) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/${modelAdi}:generateContent?key=${key}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: sistemKarakteri }] },
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        calisanModel = modelAdi; // Çalışan en güçlü modeli hafızaya al
+        return data.candidates[0].content.parts[0].text;
+      } else {
+        sonHata = data.error?.message || "Model yanıt vermedi.";
+      }
+    } catch (err) {
+      sonHata = err.message;
+    }
+  }
+
+  calisanModel = "";
+  throw new Error(sonHata);
 }
 
 function yaz(metin,kim,link){
