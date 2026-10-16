@@ -108,7 +108,6 @@ let bekleIsim=!isim;
 let sonKonu="",mod="",sayi=0,hak=0,benP=0,onP=0,bekleyenSoru="";
 const log=document.getElementById("log");
 
-// API Ayarları
 let apiKey = "";
 try { apiKey = localStorage.getItem("melcan_apikey") || ""; } catch(e) {}
 
@@ -127,12 +126,23 @@ document.getElementById("api-btn").onclick = () => {
 };
 
 async function askGemini(promptText, key) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
+  
+  const sistemKarakteri = `Senin adın MelCANAI. Mehmet Ali Şanal tarafından yaratıldın.
+  Sıradan bir yapay zeka gibi davranma. 
+  Biyoteknoloji, Moleküler Biyoloji ve Genetik konularına özel bir ilgin var.
+  Cevapların doğrudan, net ve profesyonel olmalı. 
+  Sana kim olduğun sorulduğunda Google veya Gemini'dan bahsetme, sadece MelCANAI olduğunu söyle.`;
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: sistemKarakteri }] },
+      contents: [{ parts: [{ text: promptText }] }]
+    })
   });
+  
   const data = await response.json();
   if (!response.ok) throw new Error(data.error?.message || "Bilinmeyen API Hatası");
   return data.candidates[0].content.parts[0].text;
@@ -195,7 +205,6 @@ function cevap(raw){
     return "Taş-kâğıt-makas! Taş, kağıt ya da makas yaz. (Çıkmak için 'menü' yaz)";
   }
 
-  // Önce sana öğretilenler
   const o=L.get();
   for(const q in o) if(q===m||lev(q,m)<=Math.floor(q.length/6)) return o[q];
 
@@ -217,7 +226,6 @@ async function gonder(metin){
   log.appendChild(t); log.scrollTop=log.scrollHeight;
 
   const m = norm(metin);
-  // Oyun ve menü komutları API yerine her zaman yerel fonksiyonları tetikler
   const yerelKomutlar = hasAny(m, ["sayi", "oyun", "tahmin", "makas", "tas kagit", "menu", "cik", "vazgec", "iptal"]);
 
   if (apiKey && !mod && !yerelKomutlar) {
