@@ -126,13 +126,14 @@ document.getElementById("api-btn").onclick = () => {
 };
 
 async function askGemini(promptText, key) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+  // Senin isteğin üzerine doğrudan en zeki sürüm olan PRO modeline geçtik
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`;
   
-  const sistemKarakteri = `Senin adın MelCANAI. Mehmet Ali Şanal tarafından yaratıldın.
-  Sıradan bir yapay zeka gibi davranma. 
-  Biyoteknoloji, Moleküler Biyoloji ve Genetik konularına özel bir ilgin var.
-  Cevapların doğrudan, net ve profesyonel olmalı. 
-  Sana kim olduğun sorulduğunda Google veya Gemini'dan bahsetme, sadece MelCANAI olduğunu söyle.`;
+  const sistemKarakteri = `Senin adın MelCANAI. Kurucun ve geliştiricin Mehmet Ali Şanal'dır.
+  Moleküler Biyoloji, Genetik ve biyoteknoloji alanlarında ileri düzey bir asistansın.
+  Özellikle biyosensör teknolojileri, elektroaktif bakteriler (Shewanella oneidensis MR-1) ve mikrobiyal yakıt hücreleri konularında derin analitik bilgiye sahipsin.
+  TEKNOFEST gibi inovasyon yarışmalarında ve AetherSense gibi proje geliştirme süreçlerinde kurucuna teknik araştırma desteği sağlarsın.
+  Cevapların daima doğrudan, net, profesyonel ve akademik olmalıdır. Kendini hiçbir koşulda Google veya Gemini olarak tanıtma.`;
 
   const response = await fetch(url, {
     method: "POST",
