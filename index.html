@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Melcan AI</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c5cff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Melcan AI">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💬%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -418,6 +424,18 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") yanKapat(); });
   }
   sohbetAc(id);
 })();
+
+// ---- Uygulama (PWA) ----
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+let yukleOlayi=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); yukleOlayi=e;
+  const b=document.createElement("button"); b.type="button"; b.textContent="📲 Uygulamayı yükle";
+  b.onclick=async()=>{ yukleOlayi.prompt(); try{ await yukleOlayi.userChoice; }catch(_){} yukleOlayi=null; b.remove(); };
+  q.appendChild(b);
+});
 </script>
 </body>
 </html>
