@@ -112,11 +112,19 @@ const sendBtn=document.getElementById("send");
 
 // ---- Yapay zeka: Worker üzerinden (API key sunucuda gizli) ----
 async function askAI(mesaj){
-  const res=await fetch(WORKER_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({message:mesaj,history:gecmis})
-  });
+  const ctrl=new AbortController();
+  const zt=setTimeout(()=>ctrl.abort(),40000);
+  let res;
+  try{
+    res=await fetch(WORKER_URL,{
+      method:"POST",
+      signal:ctrl.signal,
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:mesaj,history:gecmis})
+    });
+  }catch(e){
+    throw new Error(e.name==="AbortError"?"Cevap çok geç geldi, tekrar dene.":"Sunucuya ulaşılamadı.");
+  }finally{ clearTimeout(zt); }
   let data={};
   try{ data=await res.json(); }catch(e){}
   if(!res.ok) throw new Error(data.error||"Sunucu hatası ("+res.status+")");
