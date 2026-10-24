@@ -131,7 +131,15 @@ async function askAI(mesaj){
   return (data.reply||"").replace(/\*\*(.*?)\*\*/g,"$1").replace(/^\s*\*\s+/gm,"• ").trim();
 }
 
-function yaz(metin,kim,link){
+const KAYIT_KEY="melcan_sohbet", GECMIS_KEY="melcan_gecmis";
+let kayitli=[];
+function kaydet(){
+  try{
+    localStorage.setItem(KAYIT_KEY,JSON.stringify(kayitli.slice(-60)));
+    localStorage.setItem(GECMIS_KEY,JSON.stringify(gecmis));
+  }catch(e){}
+}
+function yaz(metin,kim,link,sakla=true){
   const d=document.createElement("div");
   d.className="msg "+kim; d.textContent=metin;
   if(link){
@@ -140,6 +148,36 @@ function yaz(metin,kim,link){
     a.textContent=link.text; d.appendChild(a);
   }
   log.appendChild(d); log.scrollTop=log.scrollHeight;
+  if(sakla){ kayitli.push({k:kim,t:metin,l:link||null}); kayitli=kayitli.slice(-60); kaydet(); }
+}
+// ChatGPT gibi harf harf yazma efekti
+function yazDaktilo(metin){
+  return new Promise(res=>{
+    const d=document.createElement("div");
+    d.className="msg ai"; log.appendChild(d);
+    // Tam metni hemen kaydet (yazarken sayfa yenilenirse kaybolmasın)
+    kayitli.push({k:"ai",t:metin,l:null}); kayitli=kayitli.slice(-60); kaydet();
+    const azalt=matchMedia("(prefers-reduced-motion:reduce)").matches;
+    if(azalt){ d.textContent=metin; log.scrollTop=log.scrollHeight; return res(); }
+    const adim=Math.max(1,Math.ceil(metin.length/200)); // uzun cevaplar ~4 sn'de biter
+    let i=0;
+    const zaman=setInterval(()=>{
+      i=Math.min(metin.length,i+adim);
+      d.textContent=metin.slice(0,i);
+      log.scrollTop=log.scrollHeight;
+      if(i>=metin.length){ clearInterval(zaman); res(); }
+    },20);
+  });
+}
+function selam(){
+  return bekleIsim?"Merhaba! Ben Melcan AI. Senin adın ne?":"Merhaba "+isim+"! Ne konuşmak istersin?";
+}
+function yeniSohbet(){
+  if(!confirm("Sohbet geçmişi silinsin mi?")) return;
+  kayitli=[]; gecmis=[]; mod=""; bekleyenSoru="";
+  log.innerHTML="";
+  try{ localStorage.removeItem(KAYIT_KEY); localStorage.removeItem(GECMIS_KEY); }catch(e){}
+  yaz(selam(),"ai",null,false);
 }
 
 function sayiCevap(m){
@@ -233,9 +271,9 @@ async function gonder(metin){
   try{
     const r=await askAI(metin);
     t.remove();
-    yaz(r,"ai");
     gecmis.push({role:"user",text:metin},{role:"model",text:r});
     if(gecmis.length>20) gecmis=gecmis.slice(-20);
+    await yazDaktilo(r);
   }catch(e){
     t.remove();
     yaz("⚠️ "+e.message,"ai");
@@ -261,12 +299,28 @@ document.getElementById("theme").onclick=()=>{
 };
 
 const q=document.getElementById("quick");
-[["🔢 Sayı oyunu","sayı oyunu"],["✊ Taş-kâğıt-makas","taş kağıt makas"],["🏠 Menü","menü"]]
+[["🔢 Sayı oyunu","sayı oyunu"],["✊ Taş-kâğıt-makas","taş kağıt makas"],["🏠 Menü","menü"],["🗑️ Yeni sohbet","__yeni"]]
 .forEach(([txt,k])=>{
   const b=document.createElement("button"); b.type="button"; b.textContent=txt;
-  b.onclick=()=>{ if(!bekleIsim) gonder(k); }; q.appendChild(b);
+  b.onclick=()=>{ if(k==="__yeni"){ yeniSohbet(); return; } if(!bekleIsim) gonder(k); }; q.appendChild(b);
 });
-yaz(bekleIsim?"Merhaba! Ben Melcan AI. Senin adın ne?":"Tekrar merhaba "+isim+"! Ne konuşmak istersin?","ai");
+(function(){
+  try{
+    if(!bekleIsim){
+      const k=JSON.parse(localStorage.getItem(KAYIT_KEY)||"[]");
+      const g=JSON.parse(localStorage.getItem(GECMIS_KEY)||"[]");
+      if(Array.isArray(k)) kayitli=k;
+      if(Array.isArray(g)) gecmis=g;
+    }
+  }catch(e){ kayitli=[]; gecmis=[]; }
+  if(kayitli.length){
+    const kopya=kayitli.slice(); kayitli=[];
+    kopya.forEach(x=>yaz(x.t,x.k,x.l,false));
+    kayitli=kopya;
+  } else {
+    yaz(selam(),"ai",null,false);
+  }
+})();
 </script>
 </body>
 </html>
