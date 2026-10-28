@@ -80,6 +80,17 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
 #send{border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:800;
   padding:0 18px;border-radius:14px;cursor:pointer}
 #send:disabled{opacity:.6;cursor:default}
+.msg pre{background:rgba(0,0,0,.14);padding:10px;border-radius:10px;overflow-x:auto;margin:6px 0;white-space:pre;font-size:.88rem}
+.msg code{font-family:ui-monospace,Consolas,monospace}
+.msg strong{font-weight:800}
+.msg img.ek{display:block;max-width:100%;max-height:200px;border-radius:12px;margin-top:8px}
+.ikon{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;width:44px;font-size:1.1rem;cursor:pointer}
+.ikon.acik{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ikon:focus-visible,.quick button.acik:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.quick button.acik{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#onizle{display:none;align-items:center;gap:10px;padding:0 16px 6px}
+#onizle img{height:52px;width:52px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+#onizle .ikon{width:36px;height:36px;font-size:.9rem}
 </style>
 </head>
 <body>
@@ -102,7 +113,11 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
   </header>
   <div id="log" aria-live="polite"></div>
   <div class="quick" id="quick"></div>
+  <div id="onizle"><img id="onizle-img" alt="Seçilen resim"><button type="button" id="onizle-sil" class="ikon" aria-label="Resmi kaldır">✕</button></div>
   <form id="form">
+    <input id="dosya" type="file" accept="image/*" hidden>
+    <button type="button" id="ek" class="ikon" aria-label="Resim ekle" title="Resim ekle">📎</button>
+    <button type="button" id="mik" class="ikon" aria-label="Sesle yaz" title="Sesle yaz">🎤</button>
     <input id="in" autocomplete="off" placeholder="Bir mesaj yaz..." aria-label="Mesaj">
     <button id="send" type="submit">Gönder</button>
   </form>
@@ -150,25 +165,79 @@ let bekliyor=false;  // cevap beklenirken ikinci mesajı engelle
 const log=document.getElementById("log");
 const sendBtn=document.getElementById("send");
 
-// ---- Yapay zeka: Worker üzerinden (API key sunucuda gizli) ----
-async function askAI(mesaj){
+// ---- Yapay zeka: Worker üzerinden (API key sunucuda gizli), cevap akarak gelir ----
+let internetAcik=false, sesliAcik=false, bekleyenResim=null;
+try{ internetAcik=localStorage.getItem("melcan_net")==="1"; sesliAcik=localStorage.getItem("melcan_sesli")==="1"; }catch(e){}
+
+async function askAI(mesaj,resim,onParca){
   const ctrl=new AbortController();
-  const zt=setTimeout(()=>ctrl.abort(),40000);
+  let zt=setTimeout(()=>ctrl.abort(),65000);
   let res;
   try{
     res=await fetch(WORKER_URL,{
       method:"POST",
       signal:ctrl.signal,
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message:mesaj,history:gecmis})
+      body:JSON.stringify({message:mesaj,history:gecmis,search:internetAcik,image:resim?{mime:resim.mime,data:resim.data}:undefined})
     });
   }catch(e){
+    clearTimeout(zt);
     throw new Error(e.name==="AbortError"?"Cevap çok geç geldi, tekrar dene.":"Sunucuya ulaşılamadı.");
+  }
+  if(!res.ok){
+    clearTimeout(zt);
+    let d={}; try{ d=await res.json(); }catch(e){}
+    throw new Error(d.error||"Sunucu hatası ("+res.status+")");
+  }
+  const rd=res.body.getReader(), dec=new TextDecoder();
+  let tam="";
+  try{
+    while(true){
+      const {done,value}=await rd.read();
+      if(done) break;
+      clearTimeout(zt); zt=setTimeout(()=>ctrl.abort(),30000);
+      tam+=dec.decode(value,{stream:true});
+      onParca(tam);
+    }
+  }catch(e){
+    if(!tam.trim()) throw new Error("Cevap yarıda kesildi, tekrar dene.");
   }finally{ clearTimeout(zt); }
-  let data={};
-  try{ data=await res.json(); }catch(e){}
-  if(!res.ok) throw new Error(data.error||"Sunucu hatası ("+res.status+")");
-  return (data.reply||"").replace(/\*\*(.*?)\*\*/g,"$1").replace(/^\s*\*\s+/gm,"• ").trim();
+  tam+=dec.decode();
+  tam=tam.trim();
+  if(!tam) throw new Error("Boş cevap geldi, tekrar dene.");
+  return tam;
+}
+
+// ---- Güvenli biçimlendirme: **kalın**, `kod`, ``` kod bloğu ```, - liste (innerHTML kullanmaz) ----
+function satirIci(el,satir){
+  satir.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/).forEach(p=>{
+    if(!p) return;
+    if(p.startsWith("**")&&p.endsWith("**")&&p.length>4){ const b=document.createElement("strong"); b.textContent=p.slice(2,-2); el.appendChild(b); }
+    else if(p.startsWith("`")&&p.endsWith("`")&&p.length>2){ const c=document.createElement("code"); c.textContent=p.slice(1,-1); el.appendChild(c); }
+    else el.appendChild(document.createTextNode(p));
+  });
+}
+function bicimle(el,metin){
+  el.textContent="";
+  const parcalar=metin.split("```");
+  parcalar.forEach((p,i)=>{
+    if(i%2===1){
+      const pre=document.createElement("pre"), c=document.createElement("code");
+      c.textContent=p.replace(/^[a-zA-Z0-9+#-]*\n/,"").replace(/\n$/,"");
+      pre.appendChild(c); el.appendChild(pre);
+    } else {
+      if(i>0) p=p.replace(/^\n/,"");
+      if(i<parcalar.length-1) p=p.replace(/\n$/,"");
+      const satirlar=p.split("\n");
+      satirlar.forEach((st,k)=>{
+        st=st.replace(/^#{1,6}\s+(.*)$/,"**$1**");
+        const liste=st.match(/^\s*[-*•]\s+(.*)$/);
+        if(liste){ el.appendChild(document.createTextNode("• ")); satirIci(el,liste[1]); }
+        else satirIci(el,st);
+        if(k<satirlar.length-1) el.appendChild(document.createTextNode("\n"));
+      });
+    }
+  });
 }
 
 const KAYIT_KEY="melcan_sohbet", GECMIS_KEY="melcan_gecmis"; // eski tek sohbet (taşıma için)
@@ -232,7 +301,8 @@ function sohbetSil(id){
 }
 function yaz(metin,kim,link,sakla=true){
   const d=document.createElement("div");
-  d.className="msg "+kim; d.textContent=metin;
+  d.className="msg "+kim;
+  if(kim==="ai"&&!link) bicimle(d,metin); else d.textContent=metin;
   if(link){
     d.appendChild(document.createTextNode("\n"));
     const a=document.createElement("a"); a.href=link.url; a.target="_blank"; a.rel="noopener";
@@ -240,25 +310,7 @@ function yaz(metin,kim,link,sakla=true){
   }
   log.appendChild(d); log.scrollTop=log.scrollHeight;
   if(sakla){ kayitli.push({k:kim,t:metin,l:link||null}); kayitli=kayitli.slice(-60); kaydet(); }
-}
-// ChatGPT gibi harf harf yazma efekti
-function yazDaktilo(metin){
-  return new Promise(res=>{
-    const d=document.createElement("div");
-    d.className="msg ai"; log.appendChild(d);
-    // Tam metni hemen kaydet (yazarken sayfa yenilenirse kaybolmasın)
-    kayitli.push({k:"ai",t:metin,l:null}); kayitli=kayitli.slice(-60); kaydet();
-    const azalt=matchMedia("(prefers-reduced-motion:reduce)").matches;
-    if(azalt){ d.textContent=metin; log.scrollTop=log.scrollHeight; return res(); }
-    const adim=Math.max(1,Math.ceil(metin.length/200)); // uzun cevaplar ~4 sn'de biter
-    let i=0;
-    const zaman=setInterval(()=>{
-      i=Math.min(metin.length,i+adim);
-      d.textContent=metin.slice(0,i);
-      log.scrollTop=log.scrollHeight;
-      if(i>=metin.length){ clearInterval(zaman); res(); }
-    },20);
-  });
+  return d;
 }
 function selam(){
   return bekleIsim?"Merhaba! Ben Melcan AI. Senin adın ne?":"Merhaba "+isim+"! Ne konuşmak istersin?";
@@ -325,13 +377,17 @@ function yerelYaz(metin){
   if(typeof c==="string") yaz(c,"ai"); else yaz(c.t,"ai",c.link);
 }
 
-async function gonder(metin){
+async function gonder(metin,resim){
   if(bekliyor) return;
   if(!bekleIsim){
     const sh=aktifSohbet();
     if(sh && (!sh.baslik || sh.baslik==="Yeni sohbet")) sh.baslik=metin.slice(0,40);
   }
-  yaz(metin,"me");
+  const benimMsg=yaz(resim?"📷 "+metin:metin,"me");
+  if(resim){
+    const im=document.createElement("img"); im.className="ek"; im.alt="Gönderilen resim"; im.src=resim.onizleme;
+    benimMsg.appendChild(im);
+  }
   if(bekleIsim){
     isim=metin.trim().slice(0,30)||"Dost"; bekleIsim=false;
     try{ localStorage.setItem("melcan_isim",isim); }catch(e){}
@@ -356,13 +412,22 @@ async function gonder(metin){
   bekliyor=true; sendBtn.disabled=true;
   const t=document.createElement("div"); t.className="msg ai"; t.textContent="…";
   log.appendChild(t); log.scrollTop=log.scrollHeight;
+  let bekle=false, sonParca="", bitti=false;
+  const parca=tam=>{
+    sonParca=tam;
+    if(bekle) return; bekle=true;
+    requestAnimationFrame(()=>{ bekle=false; if(bitti) return; bicimle(t,sonParca); log.scrollTop=log.scrollHeight; });
+  };
   try{
-    const r=await askAI(metin);
-    t.remove();
-    gecmis.push({role:"user",text:metin},{role:"model",text:r});
+    const r=await askAI(metin,resim,parca);
+    bitti=true;
+    bicimle(t,r); log.scrollTop=log.scrollHeight;
+    gecmis.push({role:"user",text:resim?metin+" [resim gönderildi]":metin},{role:"model",text:r});
     if(gecmis.length>20) gecmis=gecmis.slice(-20);
-    await yazDaktilo(r);
+    kayitli.push({k:"ai",t:r,l:null}); kayitli=kayitli.slice(-60); kaydet();
+    sesliOku(r);
   }catch(e){
+    bitti=true;
     t.remove();
     yaz("⚠️ "+e.message,"ai");
   }finally{
@@ -373,8 +438,11 @@ async function gonder(metin){
 
 document.getElementById("form").addEventListener("submit",e=>{
   e.preventDefault();
+  if(bekliyor) return;
   const i=document.getElementById("in"); const v=i.value.trim();
-  if(!v) return; i.value=""; gonder(v);
+  if(!v&&!bekleyenResim) return;
+  const resim=bekleyenResim; resimKaldir();
+  i.value=""; gonder(v||"Bu resmi anlat.",resim);
 });
 
 const root=document.documentElement;
@@ -424,6 +492,79 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") yanKapat(); });
   }
   sohbetAc(id);
 })();
+
+// ---- Resim yükleme ----
+const dosyaEl=document.getElementById("dosya"), onizleEl=document.getElementById("onizle");
+function resimKaldir(){
+  bekleyenResim=null; dosyaEl.value=""; onizleEl.style.display="none";
+}
+function resmiHazirla(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), im=new Image();
+    im.onload=()=>{
+      const k=Math.min(1,1024/Math.max(im.width,im.height));
+      const w=Math.round(im.width*k), h=Math.round(im.height*k);
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(im,0,0,w,h); URL.revokeObjectURL(url);
+      let kal=.82, d=c.toDataURL("image/jpeg",kal);
+      while(d.length>1400000&&kal>.4){ kal-=.12; d=c.toDataURL("image/jpeg",kal); }
+      res({mime:"image/jpeg",data:d.split(",")[1],onizleme:d});
+    };
+    im.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("Resim okunamadı.")); };
+    im.src=url;
+  });
+}
+document.getElementById("ek").onclick=()=>{ if(!WORKER_URL) return; dosyaEl.click(); };
+dosyaEl.addEventListener("change",async()=>{
+  const f=dosyaEl.files&&dosyaEl.files[0]; if(!f) return;
+  try{
+    bekleyenResim=await resmiHazirla(f);
+    document.getElementById("onizle-img").src=bekleyenResim.onizleme;
+    onizleEl.style.display="flex";
+    document.getElementById("in").focus();
+  }catch(e){ yaz("⚠️ "+e.message,"ai",null,false); resimKaldir(); }
+});
+document.getElementById("onizle-sil").onclick=resimKaldir;
+
+// ---- Sesle yazma ----
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const mikEl=document.getElementById("mik");
+if(!SR){ mikEl.style.display="none"; }
+else{
+  let rec=null, dinliyor=false;
+  mikEl.onclick=()=>{
+    if(dinliyor&&rec){ rec.stop(); return; }
+    rec=new SR(); rec.lang="tr-TR"; rec.interimResults=true; rec.continuous=false;
+    const giris=document.getElementById("in"); const onceki=giris.value;
+    rec.onresult=e=>{
+      let m=""; for(let i=0;i<e.results.length;i++) m+=e.results[i][0].transcript;
+      giris.value=(onceki?onceki+" ":"")+m;
+    };
+    rec.onstart=()=>{ dinliyor=true; mikEl.classList.add("acik"); };
+    rec.onend=()=>{ dinliyor=false; mikEl.classList.remove("acik"); };
+    rec.onerror=()=>{ dinliyor=false; mikEl.classList.remove("acik"); };
+    try{ rec.start(); }catch(e){}
+  };
+}
+
+// ---- Sesli okuma + internet anahtarları ----
+const TTS="speechSynthesis" in window;
+function sesliOku(metin){
+  if(!sesliAcik||!TTS) return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(metin.replace(/```[\s\S]*?```/g," kod bloğu ").replace(/[*`#]/g,""));
+    u.lang="tr-TR"; speechSynthesis.speak(u);
+  }catch(e){}
+}
+function anahtarEkle(etiket,aciklama,get,set,anahtar){
+  const b=document.createElement("button"); b.type="button";
+  const ciz=()=>{ b.textContent=etiket+(get()?": açık":": kapalı"); b.classList.toggle("acik",get()); b.setAttribute("aria-pressed",get()); b.title=aciklama; };
+  b.onclick=()=>{ set(!get()); try{ localStorage.setItem(anahtar,get()?"1":"0"); }catch(e){} ciz(); };
+  ciz(); q.appendChild(b);
+}
+if(WORKER_URL) anahtarEkle("🌐 İnternet","Güncel bilgi için internette ara",()=>internetAcik,v=>{internetAcik=v;},"melcan_net");
+if(TTS) anahtarEkle("🔊 Sesli","Cevapları sesli oku",()=>sesliAcik,v=>{sesliAcik=v; if(!v){ try{speechSynthesis.cancel();}catch(e){} }},"melcan_sesli");
 
 // ---- Uygulama (PWA) ----
 if("serviceWorker" in navigator){
