@@ -166,8 +166,8 @@ const log=document.getElementById("log");
 const sendBtn=document.getElementById("send");
 
 // ---- Yapay zeka: Worker üzerinden (API key sunucuda gizli), cevap akarak gelir ----
-let internetAcik=false, sesliAcik=false, bekleyenResim=null;
-try{ internetAcik=localStorage.getItem("melcan_net")==="1"; sesliAcik=localStorage.getItem("melcan_sesli")==="1"; }catch(e){}
+let sesliAcik=false, bekleyenResim=null;
+try{ sesliAcik=localStorage.getItem("melcan_sesli")==="1"; }catch(e){}
 
 async function askAI(mesaj,resim,onParca){
   const ctrl=new AbortController();
@@ -178,7 +178,7 @@ async function askAI(mesaj,resim,onParca){
       method:"POST",
       signal:ctrl.signal,
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message:mesaj,history:gecmis,search:internetAcik,image:resim?{mime:resim.mime,data:resim.data}:undefined})
+      body:JSON.stringify({message:mesaj,history:gecmis,image:resim?{mime:resim.mime,data:resim.data}:undefined})
     });
   }catch(e){
     clearTimeout(zt);
@@ -563,7 +563,6 @@ function anahtarEkle(etiket,aciklama,get,set,anahtar){
   b.onclick=()=>{ set(!get()); try{ localStorage.setItem(anahtar,get()?"1":"0"); }catch(e){} ciz(); };
   ciz(); q.appendChild(b);
 }
-if(WORKER_URL) anahtarEkle("🌐 İnternet","Güncel bilgi için internette ara",()=>internetAcik,v=>{internetAcik=v;},"melcan_net");
 if(TTS) anahtarEkle("🔊 Sesli","Cevapları sesli oku",()=>sesliAcik,v=>{sesliAcik=v; if(!v){ try{speechSynthesis.cancel();}catch(e){} }},"melcan_sesli");
 
 // ---- Uygulama (PWA) ----
