@@ -101,6 +101,12 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
 .ayar-kutu .alt button{flex:1}
 .ayar-kutu .birincil{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:800}
 .ayar-not{font-size:.8rem;color:var(--muted);margin:0}
+
+.eylem{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;white-space:normal}
+.eylem button{font:inherit;font-size:.78rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.eylem button:focus-visible,.quick select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.quick select{flex:none;font:inherit;font-size:.85rem;padding:8px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.uyari{margin:-6px 0 0;padding:0 16px 10px;font-size:.75rem;color:var(--muted);text-align:center}
 #onizle{display:none;align-items:center;gap:10px;padding:0 16px 6px}
 #onizle img{height:52px;width:52px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 #onizle .ikon{width:36px;height:36px;font-size:.9rem}
@@ -135,6 +141,7 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
     <input id="in" autocomplete="off" placeholder="Bir mesaj yaz..." aria-label="Mesaj">
     <button id="send" type="submit">Gönder</button>
   </form>
+  <p class="uyari">Melcan AI yanılabilir. Dini ve önemli konularda Diyanet'e ya da bir uzmana danışın.</p>
 </div>
 </div>
 </div>
@@ -196,6 +203,9 @@ const sendBtn=document.getElementById("send");
 
 // ---- Yapay zeka: Worker üzerinden (API key sunucuda gizli), cevap akarak gelir ----
 let sesliAcik=false, bekleyenResim=null;
+const MODLAR=[["sohbet","💬 Sohbet"],["odev","📚 Ödev yardımcısı"],["fikra","😄 Fıkra"],["dini","🕌 Dini bilgi"],["tarif","🍲 Yemek tarifi"]];
+let aktifMod="sohbet";
+try{ const m0=localStorage.getItem("melcan_mod"); if(MODLAR.some(x=>x[0]===m0)) aktifMod=m0; }catch(e){}
 try{ sesliAcik=localStorage.getItem("melcan_sesli")==="1"; }catch(e){}
 
 async function askAI(mesaj,resim,onParca){
@@ -207,7 +217,7 @@ async function askAI(mesaj,resim,onParca){
       method:"POST",
       signal:ctrl.signal,
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message:mesaj,history:gecmis,image:resim?{mime:resim.mime,data:resim.data}:undefined})
+      body:JSON.stringify({message:mesaj,history:gecmis,mode:aktifMod,image:resim?{mime:resim.mime,data:resim.data}:undefined})
     });
   }catch(e){
     clearTimeout(zt);
@@ -305,11 +315,11 @@ function sohbetAc(id){
   aktifId=id;
   kayitli=Array.isArray(sh.kayitli)?sh.kayitli.slice():[];
   gecmis=Array.isArray(sh.gecmis)?sh.gecmis.slice():[];
-  mod=""; bekleyenSoru="";
+  mod=""; bekleyenSoru=""; sonSoru=null;
   log.innerHTML="";
   if(kayitli.length){
     const kopya=kayitli.slice(); kayitli=[];
-    kopya.forEach(x=>yaz(x.t,x.k,x.l,false));
+    kopya.forEach(x=>{ const d=yaz(x.t,x.k,x.l,false); if(x.k==="ai"&&x.g) eylemEkle(d,x.t,false); });
     kayitli=kopya;
   } else yaz(selam(),"ai",null,false);
   listeKaydet(); listeCiz(); yanKapat();
@@ -443,6 +453,53 @@ async function gonder(metin,resim){
     return;
   }
 
+  await cevapUret(metin,resim);
+}
+
+// ---- Cevap altı butonlar: kopyala + yeniden üret ----
+let sonSoru=null;
+function eylemDugme(yazi,fn){
+  const b=document.createElement("button"); b.type="button"; b.textContent=yazi; b.onclick=fn; return b;
+}
+function panoyaKopyala(metin){
+  if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(metin);
+  return new Promise((res,rej)=>{
+    const ta=document.createElement("textarea"); ta.value=metin; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy")?res():rej(); }catch(e){ rej(e); }
+    ta.remove();
+  });
+}
+function eylemEkle(el,metin,yeniden){
+  const k=document.createElement("div"); k.className="eylem";
+  if(metin){
+    const c=eylemDugme("📋 Kopyala",async()=>{
+      try{ await panoyaKopyala(metin); c.textContent="✓ Kopyalandı"; }catch(e){ c.textContent="Kopyalanamadı"; }
+      setTimeout(()=>{ c.textContent="📋 Kopyala"; },1500);
+    });
+    k.appendChild(c);
+  }
+  if(yeniden&&sonSoru){
+    const r=eylemDugme(metin?"🔄 Yeniden üret":"🔄 Tekrar dene",yenidenUret); r.className="regen"; k.appendChild(r);
+  }
+  if(k.childNodes.length) el.appendChild(k);
+}
+function yenidenUret(){
+  if(bekliyor||!sonSoru) return;
+  const sonAi=[...log.querySelectorAll(".msg.ai")].pop(); if(sonAi) sonAi.remove();
+  const sonK=kayitli[kayitli.length-1];
+  if(sonK&&sonK.k==="ai"){
+    const hata=sonK.t.startsWith("⚠️");
+    kayitli.pop();
+    if(!hata&&gecmis.length>=2&&gecmis[gecmis.length-1].role==="model") gecmis.splice(-2,2);
+  }
+  kaydet();
+  cevapUret(sonSoru.metin,sonSoru.resim);
+}
+
+async function cevapUret(metin,resim){
+  sonSoru={metin,resim};
+  log.querySelectorAll(".regen").forEach(b=>b.remove());
   bekliyor=true; sendBtn.disabled=true;
   const t=document.createElement("div"); t.className="msg ai"; t.textContent="…";
   log.appendChild(t); log.scrollTop=log.scrollHeight;
@@ -458,14 +515,16 @@ async function gonder(metin,resim){
     bicimle(t,r); log.scrollTop=log.scrollHeight;
     gecmis.push({role:"user",text:resim?metin+" [resim gönderildi]":metin},{role:"model",text:r});
     if(gecmis.length>20) gecmis=gecmis.slice(-20);
-    kayitli.push({k:"ai",t:r,l:null}); kayitli=kayitli.slice(-60); kaydet();
+    kayitli.push({k:"ai",t:r,l:null,g:1}); kayitli=kayitli.slice(-60); kaydet();
+    eylemEkle(t,r,true);
     fx("cevap");
     sesliOku(r);
   }catch(e){
     bitti=true;
     t.remove();
     fx("hata");
-    yaz("⚠️ "+e.message,"ai");
+    const hd=yaz("⚠️ "+e.message,"ai");
+    eylemEkle(hd,null,true);
   }finally{
     bekliyor=false; sendBtn.disabled=false;
     document.getElementById("in").focus();
@@ -491,6 +550,13 @@ document.getElementById("theme").onclick=()=>{
 };
 
 const q=document.getElementById("quick");
+(function(){
+  const sel=document.createElement("select"); sel.setAttribute("aria-label","Mod seç"); sel.title="Mod";
+  MODLAR.forEach(([id,ad])=>{ const o=document.createElement("option"); o.value=id; o.textContent=ad; sel.appendChild(o); });
+  sel.value=aktifMod;
+  sel.onchange=()=>{ aktifMod=sel.value; try{ localStorage.setItem("melcan_mod",aktifMod); }catch(e){} };
+  q.appendChild(sel);
+})();
 [["🔢 Sayı oyunu","sayı oyunu"],["✊ Taş-kâğıt-makas","taş kağıt makas"],["🏠 Menü","menü"],["➕ Yeni sohbet","__yeni"]]
 .forEach(([txt,k])=>{
   const b=document.createElement("button"); b.type="button"; b.textContent=txt;
