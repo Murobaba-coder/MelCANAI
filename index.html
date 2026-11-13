@@ -163,7 +163,12 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
     <h3>Botun sesi</h3>
     <div id="a-konus">
       <label>Ses seçimi<select id="a-ses"></select></label>
-      <label>Konuşma hızı<input type="range" id="a-hiz" min="0.6" max="1.4" step="0.1"></label>
+      <label>Ses karakteri<select id="a-karakter">
+        <option value="">🙂 Normal</option><option value="kalin">🧔 Kalın (dede)</option><option value="ince">🧒 İnce (çocuk)</option>
+        <option value="robot">🤖 Robot</option><option value="hizli">⚡ Hızlı konuşan</option><option value="yavas">🐢 Yavaş ve tok</option>
+      </select></label>
+      <label>Konuşma hızı<input type="range" id="a-hiz" min="0.5" max="1.6" step="0.1"></label>
+      <label>Ses inceliği (perde)<input type="range" id="a-perde" min="0.2" max="2" step="0.1"></label>
       <p class="ayar-not" id="a-not"></p>
     </div>
     <h3>Benim hakkımda</h3>
@@ -770,7 +775,7 @@ else{
 }
 
 // ---- Ayarlar (kayıtlı) ----
-let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,paket:"klasik",profil:""};
+let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,perde:1,karakter:"",paket:"klasik",profil:""};
 try{ Object.assign(ayar,JSON.parse(localStorage.getItem("melcan_ayar")||"{}")); }catch(e){}
 function ayarKaydet(){ try{ localStorage.setItem("melcan_ayar",JSON.stringify(ayar)); }catch(e){} }
 
@@ -840,7 +845,7 @@ function konus(metin){
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(metin);
     const v=sesSec(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang="tr-TR";
-    u.rate=ayar.hiz; speechSynthesis.speak(u);
+    u.rate=ayar.hiz; u.pitch=ayar.perde||1; speechSynthesis.speak(u);
   }catch(e){}
 }
 function sesliOku(metin){
@@ -858,6 +863,7 @@ if(TTS) anahtarEkle("🔊 Sesli","Cevapları sesli oku",()=>sesliAcik,v=>{sesliA
 // ---- Ayar paneli ----
 const panelEl=document.getElementById("ayar-panel");
 const aEfekt=document.getElementById("a-efekt"), aEfektSes=document.getElementById("a-efektses");
+const aKarakter=document.getElementById("a-karakter"), aPerde=document.getElementById("a-perde");
 const aPaket=document.getElementById("a-paket"), aProfil=document.getElementById("a-profil");
 const aSes=document.getElementById("a-ses"), aHiz=document.getElementById("a-hiz"), aNot=document.getElementById("a-not");
 function sesListesiDoldur(){
@@ -873,7 +879,7 @@ function sesListesiDoldur(){
     :"Bu cihazda Türkçe ses bulunamadı, tüm sesler gösteriliyor. Türkçe okumayabilir.";
 }
 function ayarAc(){
-  aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
+  aKarakter.value=ayar.karakter||""; aPerde.value=ayar.perde||1; aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
   sesListesiDoldur(); panelEl.hidden=false; document.getElementById("a-kapat").focus();
 }
 function ayarKapat(){ if(!panelEl.hidden){ panelEl.hidden=true; try{speechSynthesis.cancel();}catch(e){} document.getElementById("ayar-btn").focus(); } }
@@ -887,6 +893,14 @@ aPaket.onchange=()=>{ ayar.paket=aPaket.value; ayarKaydet(); fx("kazan"); };
 aProfil.oninput=()=>{ ayar.profil=aProfil.value.slice(0,600); ayarKaydet(); };
 aSes.onchange=()=>{ ayar.ses=aSes.value; ayarKaydet(); };
 aHiz.oninput=()=>{ ayar.hiz=parseFloat(aHiz.value); ayarKaydet(); };
+aPerde.oninput=()=>{ ayar.perde=parseFloat(aPerde.value); ayar.karakter=""; aKarakter.value=""; ayarKaydet(); };
+const KARAKTERLER={"":[1,1],kalin:[.4,.85],ince:[1.8,1.1],robot:[.3,.9],hizli:[1,1.5],yavas:[.7,.7]};
+aKarakter.onchange=()=>{
+  const k=KARAKTERLER[aKarakter.value]||KARAKTERLER[""];
+  ayar.karakter=aKarakter.value; ayar.perde=k[0]; ayar.hiz=k[1];
+  aPerde.value=k[0]; aHiz.value=k[1]; ayarKaydet();
+  if(TTS) konus("Merhaba, ben Melcan AI. Sesim böyle.");
+};
 document.getElementById("a-dene").onclick=()=>{ fx("kazan"); if(TTS) setTimeout(()=>konus("Merhaba, ben Melcan AI."),500); };
 if(TTS && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged",()=>{ if(!panelEl.hidden) sesListesiDoldur(); });
 
