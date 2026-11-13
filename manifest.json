@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Melcan AI",
-  "short_name": "Melcan AI",
+  "name": "MelCAN AI",
+  "short_name": "MelCAN AI",
   "description": "Türkçe yapay zeka sohbet asistanı",
   "lang": "tr",
   "start_url": "./",
