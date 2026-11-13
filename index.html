@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Melcan AI</title>
+<title>MelCAN AI</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#7c5cff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Melcan AI">
+<meta name="apple-mobile-web-app-title" content="MelCAN AI">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💬%3C/text%3E%3C/svg%3E">
 <style>
@@ -131,7 +131,7 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
 <div class="app">
   <header>
     <button id="menu" type="button" aria-label="Sohbetler">☰</button>
-    <h1>Melcan AI</h1>
+    <h1>MelCAN AI</h1>
     <span>sohbet, bilgi, oyun, öğrenen bot</span>
     <div class="header-btns">
       <button id="ayar-btn" type="button" aria-label="Ses ayarları" title="Ses ayarları">⚙️</button>
@@ -149,7 +149,7 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
     <input id="in" autocomplete="off" placeholder="Bir mesaj yaz..." aria-label="Mesaj">
     <button id="send" type="submit">Gönder</button>
   </form>
-  <p class="uyari">Melcan AI yanılabilir. Dini ve önemli konularda Diyanet'e ya da bir uzmana danışın.</p>
+  <p class="uyari">MelCAN AI yanılabilir. Dini ve önemli konularda Diyanet'e ya da bir uzmana danışın.</p>
 </div>
 </div>
 </div>
@@ -172,8 +172,8 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
       <p class="ayar-not" id="a-not"></p>
     </div>
     <h3>Benim hakkımda</h3>
-    <label>Melcan AI'nın bilmesini istediklerin<textarea id="a-profil" rows="4" maxlength="600" placeholder="Örn: En sevdiğim kuzenim Ali. Annemin adı Ayşe. 6. sınıfa giden kız kardeşim var."></textarea></label>
-    <p class="ayar-not">Bu notlar sadece bu cihazda saklanır ve her mesajla yapay zekaya gönderilir. Şifre, TC kimlik no gibi gizli bilgi yazma. Not: Melcan AI fotoğraftan yüz tanımaz, kişileri bu notlardan tanır.</p>
+    <label>MelCAN AI'nın bilmesini istediklerin<textarea id="a-profil" rows="4" maxlength="600" placeholder="Örn: En sevdiğim kuzenim Ali. Annemin adı Ayşe. 6. sınıfa giden kız kardeşim var."></textarea></label>
+    <p class="ayar-not">Bu notlar sadece bu cihazda saklanır ve her mesajla yapay zekaya gönderilir. Şifre, TC kimlik no gibi gizli bilgi yazma. Not: MelCAN AI fotoğraftan yüz tanımaz, kişileri bu notlardan tanır.</p>
     <div class="alt"><button type="button" id="a-dene">▶ Dene</button><button type="button" id="a-kapat" class="birincil">Tamam</button></div>
   </div>
 </div>
@@ -375,7 +375,7 @@ function yaz(metin,kim,link,sakla=true){
   return d;
 }
 function selam(){
-  return bekleIsim?"Merhaba! Ben Melcan AI. Senin adın ne?":"Merhaba "+isim+"! Ne konuşmak istersin?";
+  return bekleIsim?"Merhaba! Ben MelCAN AI. Senin adın ne?":"Merhaba "+isim+"! Ne konuşmak istersin?";
 }
 
 function sayiCevap(m){
