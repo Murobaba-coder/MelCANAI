@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MelCAN AI Yönetim</title>
+<style>
+:root{
+  --bg:#f3f1fb; --panel:#ffffff; --ink:#1d1b2e; --muted:#6b6785; --accent:#7c5cff; --accent-ink:#ffffff;
+  --line:#d9d4ee; --bad:#c0392b; --good:#1e8e5a; --warn:#b9770e;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#1e1e2e; --panel:#2b2b3d; --ink:#f1effb; --muted:#a29fbd; --line:#3d3d58; --bad:#ff8a7a; --good:#5fd39b; --warn:#f0b85a; }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Nunito","Segoe UI",system-ui,sans-serif;line-height:1.45}
+main{max-width:760px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.3rem;margin:0 0 4px}
+h2{font-size:1rem;margin:22px 0 8px}
+p.alt{margin:0 0 16px;color:var(--muted);font-size:.9rem}
+.kutu{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+form{display:flex;gap:8px;flex-wrap:wrap}
+input[type=password]{flex:1;min-width:180px;font:inherit;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+button{font:inherit;font-weight:800;padding:11px 16px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#durum{margin:10px 0 0;min-height:1.2em;font-size:.9rem}
+#durum.hata{color:var(--bad)}
+.kartlar{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kart{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+.kart b{display:block;font-size:1.6rem;line-height:1.1}
+.kart span{font-size:.8rem;color:var(--muted)}
+.kart.iyi b{color:var(--good)} .kart.kotu b{color:var(--bad)} .kart.uyari b{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:700;font-size:.75rem}
+.tablo{overflow-x:auto}
+.cubuk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:.85rem}
+.cubuk .ad{width:110px;flex:none}
+.cubuk .dolu{height:12px;border-radius:6px;background:var(--accent);min-width:2px}
+.cubuk .n{color:var(--muted)}
+.not{font-size:.8rem;color:var(--muted);margin-top:16px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>MelCAN AI · Yönetim</h1>
+  <p class="alt">Kaç kişi kullanıyor, kaç mesaj atılıyor, kaç hata çıkıyor. Sadece sayılar, mesaj içeriği görünmez.</p>
+
+  <div class="kutu">
+    <form id="form">
+      <input id="anahtar" type="password" placeholder="Yönetici anahtarı" autocomplete="current-password" aria-label="Yönetici anahtarı" required>
+      <button id="gir" type="submit">Göster</button>
+    </form>
+    <p id="durum" role="status"></p>
+  </div>
+
+  <div id="sonuc" hidden>
+    <h2>Bugün</h2>
+    <div class="kartlar" id="bugun"></div>
+
+    <h2>Son 30 gün</h2>
+    <div class="kartlar" id="otuz"></div>
+
+    <h2>Günlük döküm</h2>
+    <div class="kutu tablo"><table id="tablo"></table></div>
+
+    <h2>Hangi mod ne kadar kullanılıyor (30 gün)</h2>
+    <div class="kutu" id="modlar"></div>
+  </div>
+
+  <p class="not">Not: "Kişi", cihaz/ağ başına sayılan tahmini sayıdır (aynı Wi-Fi'daki kişiler tek sayılabilir, mobil veride bir kişi iki kez sayılabilir). Gün sınırı Türkiye saatine göredir.</p>
+</main>
+<script>
+const WORKER_URL = "https://melcan-ai.fatmafetretmrt.workers.dev";
+const MOD_AD = {sohbet:"💬 Sohbet",odev:"📚 Ödev",fikra:"😄 Fıkra",dini:"🕌 Dini bilgi",tarif:"🍲 Tarif",karadeniz:"🌊 Karadeniz",trakya:"🌾 Trakya",ege:"🫒 Ege",masal:"📖 Masal",sinav:"📝 Sınav",kodlayici:"💻 Kodlayıcı",ceviri:"🌍 Çevirmen",yazar:"✍️ Yazı",ingilizce:"🇬🇧 İngilizce"};
+const $=id=>document.getElementById(id);
+const sayi=n=>(n||0).toLocaleString("tr-TR");
+function kart(kutu,deger,etiket,sinif){
+  const d=document.createElement("div"); d.className="kart"+(sinif?" "+sinif:"");
+  const b=document.createElement("b"); b.textContent=sayi(deger);
+  const s=document.createElement("span"); s.textContent=etiket;
+  d.append(b,s); kutu.appendChild(d);
+}
+function ciz(v){
+  const gunler=v.gunler||[];
+  const bugun=gunler.find(g=>g.day===v.bugun)||{kisi:0,olaylar:{}};
+  const o=bugun.olaylar||{};
+  const k=$("bugun"); k.textContent="";
+  kart(k,bugun.kisi,"kişi (tahmini)");
+  kart(k,o.mesaj,"mesaj");
+  kart(k,o.basarili,"başarılı cevap","iyi");
+  kart(k,o.kota,"kota doldu",o.kota?"uyari":"");
+  kart(k,o.hata,"hata",o.hata?"kotu":"");
+  kart(k,(o.limit_dk||0)+(o.limit_gun||0),"kişi limiti");
+
+  const top={mesaj:0,basarili:0,kota:0,hata:0,arama:0,dosya:0,resim:0};
+  const modTop={};
+  gunler.forEach(g=>{ const x=g.olaylar||{};
+    Object.keys(top).forEach(a=>{ top[a]+=x[a]||0; });
+    Object.keys(x).forEach(a=>{ if(a.startsWith("mod_")) modTop[a.slice(4)]=(modTop[a.slice(4)]||0)+x[a]; });
+  });
+  const t=$("otuz"); t.textContent="";
+  kart(t,v.benzersiz30,"farklı kişi (tahmini)");
+  kart(t,top.mesaj,"mesaj");
+  kart(t,top.kota,"kota doldu",top.kota?"uyari":"");
+  kart(t,top.hata,"hata",top.hata?"kotu":"");
+  kart(t,top.arama,"internet araması");
+  kart(t,top.dosya+top.resim,"dosya / resim");
+
+  const tb=$("tablo"); tb.textContent="";
+  const bas=document.createElement("tr");
+  ["Gün","Kişi","Mesaj","Başarılı","Kota","Hata"].forEach(h=>{ const th=document.createElement("th"); th.textContent=h; bas.appendChild(th); });
+  tb.appendChild(bas);
+  gunler.forEach(g=>{
+    const x=g.olaylar||{}; const tr=document.createElement("tr");
+    [g.day.slice(5).split("-").reverse().join("."),g.kisi,x.mesaj,x.basarili,x.kota,x.hata].forEach(h=>{ const td=document.createElement("td"); td.textContent=typeof h==="number"||h===undefined?sayi(h):h; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+
+  const m=$("modlar"); m.textContent="";
+  const liste=Object.entries(modTop).sort((a,b)=>b[1]-a[1]);
+  const en=liste.length?liste[0][1]:1;
+  if(!liste.length){ m.textContent="Henüz veri yok."; }
+  liste.forEach(([ad,n])=>{
+    const r=document.createElement("div"); r.className="cubuk";
+    const a=document.createElement("span"); a.className="ad"; a.textContent=MOD_AD[ad]||ad;
+    const c=document.createElement("div"); c.className="dolu"; c.style.width=Math.max(2,Math.round(n/en*100))+"%";
+    const s=document.createElement("span"); s.className="n"; s.textContent=sayi(n);
+    r.append(a,c,s); m.appendChild(r);
+  });
+  $("sonuc").hidden=false;
+}
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const d=$("durum"), btn=$("gir"); d.className=""; d.textContent="Getiriliyor…"; btn.disabled=true;
+  try{
+    const r=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stats:true,key:$("anahtar").value})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||("Sunucu hatası ("+r.status+")"));
+    d.textContent="Güncellendi: "+new Date().toLocaleTimeString("tr-TR");
+    ciz(j);
+  }catch(err){
+    d.className="hata"; d.textContent=err.message==="Failed to fetch"?"Sunucuya ulaşılamadı.":err.message; $("sonuc").hidden=true;
+  }finally{ btn.disabled=false; }
+});
+</script>
+</body>
+</html>
