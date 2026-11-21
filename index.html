@@ -182,6 +182,8 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
       <p class="ayar-not" id="a-not"></p>
     </div>
     <h3>Görünüm</h3>
+    <label class="sat"><span>Sohbetlere akıllı başlık ver</span><input type="checkbox" id="a-baslik"></label>
+    <p class="ayar-not">Açıkken her yeni sohbetin ilk cevabından sonra konuyu özetleyen kısa bir başlık üretilir (küçük bir ek istek kullanır).</p>
     <label>Yazı boyutu<input type="range" id="a-yazi" min="0.9" max="1.6" step="0.1"></label>
     <h3>Namaz vakitleri</h3>
     <label>Şehrim<input type="text" id="a-sehir" maxlength="30" placeholder="Örn: Ankara" autocomplete="off"></label>
@@ -189,6 +191,9 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
     <div class="alt"><button type="button" id="a-indir">⬇️ İndir</button><button type="button" id="a-yukle">⬆️ Yükle</button></div>
     <input type="file" id="a-yukle-dosya" accept=".json,application/json" hidden>
     <p class="ayar-not" id="a-aktar-not">Sohbetlerini bir dosyaya indirip başka cihazda yükleyebilirsin (telefon ↔ bilgisayar).</p>
+    <h3>Gizlilik</h3>
+    <div class="alt"><button type="button" id="a-sil">🗑️ Bu cihazdaki tüm verilerimi sil</button></div>
+    <p class="ayar-not" id="a-sil-not">Sohbetlerini, ayarlarını ve notlarını bu cihazdan siler. Sunucuda mesaj içeriği saklanmaz.</p>
     <h3>Benim hakkımda</h3>
     <label>MelCAN AI'nın bilmesini istediklerin<textarea id="a-profil" rows="4" maxlength="600" placeholder="Örn: En sevdiğim kuzenim Ali. Annemin adı Ayşe. 6. sınıfa giden kız kardeşim var."></textarea></label>
     <p class="ayar-not">Bu notlar sadece bu cihazda saklanır ve her mesajla yapay zekaya gönderilir. Şifre, TC kimlik no gibi gizli bilgi yazma. Not: MelCAN AI fotoğraftan yüz tanımaz, kişileri bu notlardan tanır.</p>
@@ -201,7 +206,8 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
     <p class="hak-metin">MelCAN AI, <strong>Muro Baba</strong> tarafından geliştirilen Türkçe bir yapay zekâ sohbet asistanıdır.</p>
     <p class="hak-metin">Cevaplar <strong>Google Gemini</strong> yapay zekâ modeliyle üretilir; MelCAN AI kendi eğittiğimiz bir model değildir. Üzerine kendi arayüzümüzü, modlarımızı ve oyunlarımızı ekledik.</p>
     <p class="hak-metin">Yanılabilir. Dini, sağlık, hukuk ve önemli konularda mutlaka bir uzmana ya da Diyanet'e danış.</p>
-    <p class="hak-metin">Gizlilik: Mesajların cevap üretmek için Google'a gönderilir. Sohbet geçmişin yalnızca senin cihazında saklanır. Şifre, TC kimlik no gibi gizli bilgi yazma.</p>
+    <p class="hak-metin"><strong>Verilerin nereye gider?</strong> Yazdığın mesaj (ve eklediğin resim/dosya) önce MelCAN AI'nın sunucusuna (Cloudflare), oradan cevap üretmek için Google Gemini'ye gönderilir. Sohbet geçmişin yalnızca senin cihazında saklanır; sunucumuzda mesaj içeriği tutulmaz, sadece kaç mesaj geldiği gibi sayılar tutulur.</p>
+    <p class="hak-metin">Google'ın ücretsiz API koşullarına göre gönderilen içerik Google tarafından ürünlerini geliştirmek için kullanılabilir ve insan inceleyiciler okuyabilir. Bu yüzden şifre, TC kimlik no, adres, sağlık gibi kişisel ve gizli bilgileri yazma. Çocuklar bir yetişkinle birlikte kullansın.</p>
     <div class="alt"><button type="button" id="hak-kapat" class="birincil">Tamam</button></div>
   </div>
 </div>
@@ -568,11 +574,26 @@ function yerelYaz(metin){
   if(typeof c==="string") yaz(c,"ai"); else yaz(c.t,"ai",c.link);
 }
 
+function baslikTemizle(t){
+  return String(t||"").replace(/[\r\n]+/g," ").replace(/["'“”‘’`*#]/g,"").replace(/[.:;,!?\s]+$/g,"").trim().slice(0,40);
+}
+async function baslikUret(id,soru,cevap){
+  try{
+    if(!WORKER_URL||ayar.akilliBaslik===false) return;
+    const sh=sohbetler.find(x=>x.id===id); if(!sh||sh.baslikAI) return;
+    const res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:true,message:soru.slice(0,300),reply:cevap.slice(0,300)})});
+    if(!res.ok) return;
+    const t=baslikTemizle((await res.json()).title);
+    const hedef=sohbetler.find(x=>x.id===id);
+    if(!t||!hedef) return;
+    hedef.baslik=t; hedef.baslikAI=true; listeKaydet(); listeCiz();
+  }catch(e){}
+}
 async function gonder(metin,resim,dosya){
   if(bekliyor) return;
   if(!bekleIsim){
     const sh=aktifSohbet();
-    if(sh && (!sh.baslik || sh.baslik==="Yeni sohbet")) sh.baslik=metin.slice(0,40);
+    if(sh && (!sh.baslik || sh.baslik==="Yeni sohbet")) sh.baslik=metin.length>38?metin.slice(0,38).replace(/\s+\S*$/,"")+"…":metin;
   }
   log.querySelectorAll(".oneriler").forEach(e=>e.remove());
   const benimMsg=yaz(resim?"📷 "+metin:dosya?"📄 "+metin:metin,"me");
@@ -704,6 +725,7 @@ async function cevapUret(metin,resim,dosya){
     if(gecmis.length>20) gecmis=gecmis.slice(-20);
     kayitli.push({k:"ai",t:r,l:null,g:1,q:metin.slice(0,200),m:aktifMod,s:sonuc.kaynaklar.length?sonuc.kaynaklar:undefined}); kayitli=kayitli.slice(-60); kaydet();
     eylemEkle(t,r,true,sonuc.kaynaklar,metin,aktifMod);
+    { const sh0=aktifSohbet(); if(sh0&&!sh0.baslikAI&&sh0.kayitli.filter(x=>x.k==="ai"&&x.g).length===1) baslikUret(sh0.id,metin,r); }
     fx("cevap");
     sesliOku(r);
   }catch(e){
@@ -872,7 +894,7 @@ else{
 }
 
 // ---- Ayarlar (kayıtlı) ----
-let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,perde:1,karakter:"",paket:"klasik",profil:"",yazi:1,sehir:""};
+let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,perde:1,karakter:"",paket:"klasik",profil:"",yazi:1,sehir:"",akilliBaslik:true};
 try{ Object.assign(ayar,JSON.parse(localStorage.getItem("melcan_ayar")||"{}")); }catch(e){}
 function yaziUygula(){ document.documentElement.style.setProperty("--yz",String(ayar.yazi||1)); }
 yaziUygula();
@@ -962,6 +984,7 @@ if(TTS) anahtarEkle("🔊 Sesli","Cevapları sesli oku",()=>sesliAcik,v=>{sesliA
 // ---- Ayar paneli ----
 const panelEl=document.getElementById("ayar-panel");
 const aEfekt=document.getElementById("a-efekt"), aEfektSes=document.getElementById("a-efektses");
+const aBaslik=document.getElementById("a-baslik"), aSil=document.getElementById("a-sil");
 const aYazi=document.getElementById("a-yazi"), aSehir=document.getElementById("a-sehir");
 const aKarakter=document.getElementById("a-karakter"), aPerde=document.getElementById("a-perde");
 const aPaket=document.getElementById("a-paket"), aProfil=document.getElementById("a-profil");
@@ -979,7 +1002,7 @@ function sesListesiDoldur(){
     :"Bu cihazda Türkçe ses bulunamadı, tüm sesler gösteriliyor. Türkçe okumayabilir.";
 }
 function ayarAc(){
-  aYazi.value=ayar.yazi||1; aSehir.value=ayar.sehir||""; aKarakter.value=ayar.karakter||""; aPerde.value=ayar.perde||1; aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
+  aBaslik.checked=ayar.akilliBaslik!==false; aYazi.value=ayar.yazi||1; aSehir.value=ayar.sehir||""; aKarakter.value=ayar.karakter||""; aPerde.value=ayar.perde||1; aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
   sesListesiDoldur(); panelEl.hidden=false; document.getElementById("a-kapat").focus();
 }
 function ayarKapat(){ if(!panelEl.hidden){ panelEl.hidden=true; try{speechSynthesis.cancel();}catch(e){} document.getElementById("ayar-btn").focus(); } }
@@ -993,6 +1016,20 @@ aPaket.onchange=()=>{ ayar.paket=aPaket.value; ayarKaydet(); fx("kazan"); };
 aProfil.oninput=()=>{ ayar.profil=aProfil.value.slice(0,600); ayarKaydet(); };
 aSes.onchange=()=>{ ayar.ses=aSes.value; ayarKaydet(); };
 aHiz.oninput=()=>{ ayar.hiz=parseFloat(aHiz.value); ayarKaydet(); };
+aBaslik.onchange=()=>{ ayar.akilliBaslik=aBaslik.checked; ayarKaydet(); };
+let silHazir=null;
+aSil.onclick=()=>{
+  const not=document.getElementById("a-sil-not");
+  if(!silHazir){
+    aSil.textContent="⚠️ Emin misin? Tekrar bas";
+    not.textContent="Bu işlem geri alınamaz. İstersen önce ⬇️ İndir ile sohbetlerini yedekle.";
+    silHazir=setTimeout(()=>{ silHazir=null; aSil.textContent="🗑️ Bu cihazdaki tüm verilerimi sil"; },5000);
+    return;
+  }
+  clearTimeout(silHazir);
+  try{ Object.keys(localStorage).filter(k=>k.startsWith("melcan_")).forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  location.reload();
+};
 aYazi.oninput=()=>{ ayar.yazi=parseFloat(aYazi.value)||1; yaziUygula(); ayarKaydet(); };
 aSehir.oninput=()=>{ ayar.sehir=aSehir.value.slice(0,30); ayarKaydet(); };
 aPerde.oninput=()=>{ ayar.perde=parseFloat(aPerde.value); ayar.karakter=""; aKarakter.value=""; ayarKaydet(); };
