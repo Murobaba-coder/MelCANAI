@@ -82,6 +82,12 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
 #send:disabled{opacity:.6;cursor:default}
 .msg pre{background:rgba(0,0,0,.14);padding:10px;border-radius:10px;overflow-x:auto;margin:6px 0;white-space:pre;font-size:.88rem}
 .msg code{font-family:ui-monospace,Consolas,monospace}
+.kodkutu{margin:8px 0;border-radius:10px;overflow:hidden;background:rgba(0,0,0,.14)}
+.kodust{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 12px;background:rgba(0,0,0,.14);font-size:.75rem}
+.kodust span{opacity:.8;font-family:ui-monospace,Consolas,monospace}
+.kodust button{font:inherit;font-size:.75rem;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.kodust button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.msg .kodkutu pre{margin:0;border-radius:0;background:none}
 .msg strong{font-weight:800}
 .msg img.ek{display:block;max-width:100%;max-height:200px;border-radius:12px;margin-top:8px}
 .ikon{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;width:44px;font-size:1.1rem;cursor:pointer}
@@ -182,6 +188,7 @@ form{display:flex;gap:8px;padding:8px 16px 14px}
       <p class="ayar-not" id="a-not"></p>
     </div>
     <h3>Görünüm</h3>
+    <label class="sat"><span>Siteyi açınca yeni sohbetle başla</span><input type="checkbox" id="a-yeni"></label>
     <label class="sat"><span>Sohbetlere akıllı başlık ver</span><input type="checkbox" id="a-baslik"></label>
     <p class="ayar-not">Açıkken her yeni sohbetin ilk cevabından sonra konuyu özetleyen kısa bir başlık üretilir (küçük bir ek istek kullanır).</p>
     <label>Yazı boyutu<input type="range" id="a-yazi" min="0.9" max="1.6" step="0.1"></label>
@@ -324,8 +331,21 @@ function bicimle(el,metin){
   parcalar.forEach((p,i)=>{
     if(i%2===1){
       const pre=document.createElement("pre"), c=document.createElement("code");
-      c.textContent=p.replace(/^[a-zA-Z0-9+#-]*\n/,"").replace(/\n$/,"");
-      pre.appendChild(c); el.appendChild(pre);
+      const dilEs=p.match(/^([a-zA-Z0-9+#-]*)\n/), dil=dilEs?dilEs[1]:"";
+      const kod=p.replace(/^[a-zA-Z0-9+#-]*\n/,"").replace(/\n$/,"");
+      c.textContent=kod; pre.appendChild(c);
+      if(dil==="cizim"){ el.appendChild(pre); }
+      else {
+        const kutu=document.createElement("div"); kutu.className="kodkutu";
+        const ust=document.createElement("div"); ust.className="kodust";
+        const ad=document.createElement("span"); ad.textContent=dil||"kod";
+        const kb=document.createElement("button"); kb.type="button"; kb.textContent="📋 Kopyala"; kb.setAttribute("aria-label","Kodu kopyala");
+        kb.onclick=()=>{
+          panoyaKopyala(kod).then(()=>{ kb.textContent="✓ Kopyalandı"; }).catch(()=>{ kb.textContent="Kopyalanamadı"; });
+          setTimeout(()=>{ kb.textContent="📋 Kopyala"; },1800);
+        };
+        ust.append(ad,kb); kutu.append(ust,pre); el.appendChild(kutu);
+      }
     } else {
       if(i>0) p=p.replace(/^\n/,"");
       if(i<parcalar.length-1) p=p.replace(/\n$/,"");
@@ -492,7 +512,7 @@ const ASM_CIZIM=[
 let asmKelime="", asmBulunan=[], asmYanlis=[];
 function asmDurum(){
   const gor=[...asmKelime].map(c=>asmBulunan.includes(norm(c))?c:"_").join(" ");
-  return "```\n"+ASM_CIZIM[asmYanlis.length]+"\n```\nKelime: "+gor+"\nYanlışlar ("+asmYanlis.length+"/6): "+(asmYanlis.join(", ")||"-")+"\nBir harf ya da tüm kelimeyi yaz. (Çıkmak için 'menü' yaz)";
+  return "```cizim\n"+ASM_CIZIM[asmYanlis.length]+"\n```\nKelime: "+gor+"\nYanlışlar ("+asmYanlis.length+"/6): "+(asmYanlis.join(", ")||"-")+"\nBir harf ya da tüm kelimeyi yaz. (Çıkmak için 'menü' yaz)";
 }
 function asmBasla(){
   asmKelime=pick(ASM_KELIMELER); asmBulunan=[]; asmYanlis=[]; mod="asmaca";
@@ -500,7 +520,7 @@ function asmBasla(){
 }
 function asmCevap(m){
   const tamam=()=>[...asmKelime].every(c=>asmBulunan.includes(norm(c)));
-  const kaybet=()=>{ const k=asmKelime; mod=""; return "```\n"+ASM_CIZIM[6]+"\n```\nAdam asıldı! Kelime "+k+" idi. Ben kazandım! 😄"; };
+  const kaybet=()=>{ const k=asmKelime; mod=""; return "```cizim\n"+ASM_CIZIM[6]+"\n```\nAdam asıldı! Kelime "+k+" idi. Ben kazandım! 😄"; };
   const kazan=()=>{ const k=asmKelime; mod=""; return "Tebrikler! Kelimeyi buldun: "+k+" 🎉"; };
   if(m.length===1&&/[a-z]/.test(m)){
     if(asmBulunan.includes(m)||asmYanlis.includes(m.toUpperCase())) return "Bu harfi zaten söyledin.\n"+asmDurum();
@@ -800,6 +820,18 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ yanKapat(); ayarK
   } else {
     if(!sohbetler.length) sohbetler.push({id:yeniId(),baslik:"Yeni sohbet",t:Date.now(),kayitli:[],gecmis:[]});
     if(!sohbetler.some(c=>c.id===id)) id=sohbetler[0].id;
+    // Siteyi (yeniden) açınca yeni sohbet: sayfa yenilemesinde aynı sohbet kalır, sekme/uygulama kapanıp açılınca yeni sohbet başlar
+    let yeniAc=true, ilkAcilis=true;
+    try{ const a=JSON.parse(localStorage.getItem("melcan_ayar")||"{}"); if(a&&a.acilistaYeni===false) yeniAc=false; }catch(e){}
+    try{ ilkAcilis=!sessionStorage.getItem("melcan_oturum"); sessionStorage.setItem("melcan_oturum","1"); }catch(e){ ilkAcilis=false; }
+    if(yeniAc&&ilkAcilis){
+      const cur=sohbetler.find(c=>c.id===id);
+      if(cur&&cur.kayitli&&cur.kayitli.length){
+        let bos=sohbetler.find(c=>!(c.kayitli&&c.kayitli.length));
+        if(!bos){ bos={id:yeniId(),baslik:"Yeni sohbet",t:Date.now(),kayitli:[],gecmis:[]}; sohbetler.unshift(bos); }
+        id=bos.id;
+      }
+    }
   }
   sohbetAc(id);
 })();
@@ -894,7 +926,7 @@ else{
 }
 
 // ---- Ayarlar (kayıtlı) ----
-let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,perde:1,karakter:"",paket:"klasik",profil:"",yazi:1,sehir:"",akilliBaslik:true};
+let ayar={efekt:true,efektSes:0.6,ses:"",hiz:1,perde:1,karakter:"",paket:"klasik",profil:"",yazi:1,sehir:"",akilliBaslik:true,acilistaYeni:true};
 try{ Object.assign(ayar,JSON.parse(localStorage.getItem("melcan_ayar")||"{}")); }catch(e){}
 function yaziUygula(){ document.documentElement.style.setProperty("--yz",String(ayar.yazi||1)); }
 yaziUygula();
@@ -984,7 +1016,7 @@ if(TTS) anahtarEkle("🔊 Sesli","Cevapları sesli oku",()=>sesliAcik,v=>{sesliA
 // ---- Ayar paneli ----
 const panelEl=document.getElementById("ayar-panel");
 const aEfekt=document.getElementById("a-efekt"), aEfektSes=document.getElementById("a-efektses");
-const aBaslik=document.getElementById("a-baslik"), aSil=document.getElementById("a-sil");
+const aYeni=document.getElementById("a-yeni"), aBaslik=document.getElementById("a-baslik"), aSil=document.getElementById("a-sil");
 const aYazi=document.getElementById("a-yazi"), aSehir=document.getElementById("a-sehir");
 const aKarakter=document.getElementById("a-karakter"), aPerde=document.getElementById("a-perde");
 const aPaket=document.getElementById("a-paket"), aProfil=document.getElementById("a-profil");
@@ -1002,7 +1034,7 @@ function sesListesiDoldur(){
     :"Bu cihazda Türkçe ses bulunamadı, tüm sesler gösteriliyor. Türkçe okumayabilir.";
 }
 function ayarAc(){
-  aBaslik.checked=ayar.akilliBaslik!==false; aYazi.value=ayar.yazi||1; aSehir.value=ayar.sehir||""; aKarakter.value=ayar.karakter||""; aPerde.value=ayar.perde||1; aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
+  aYeni.checked=ayar.acilistaYeni!==false; aBaslik.checked=ayar.akilliBaslik!==false; aYazi.value=ayar.yazi||1; aSehir.value=ayar.sehir||""; aKarakter.value=ayar.karakter||""; aPerde.value=ayar.perde||1; aEfekt.checked=ayar.efekt; aEfektSes.value=ayar.efektSes; aPaket.value=ayar.paket||"klasik"; aProfil.value=ayar.profil||""; aHiz.value=ayar.hiz;
   sesListesiDoldur(); panelEl.hidden=false; document.getElementById("a-kapat").focus();
 }
 function ayarKapat(){ if(!panelEl.hidden){ panelEl.hidden=true; try{speechSynthesis.cancel();}catch(e){} document.getElementById("ayar-btn").focus(); } }
@@ -1016,6 +1048,7 @@ aPaket.onchange=()=>{ ayar.paket=aPaket.value; ayarKaydet(); fx("kazan"); };
 aProfil.oninput=()=>{ ayar.profil=aProfil.value.slice(0,600); ayarKaydet(); };
 aSes.onchange=()=>{ ayar.ses=aSes.value; ayarKaydet(); };
 aHiz.oninput=()=>{ ayar.hiz=parseFloat(aHiz.value); ayarKaydet(); };
+aYeni.onchange=()=>{ ayar.acilistaYeni=aYeni.checked; ayarKaydet(); };
 aBaslik.onchange=()=>{ ayar.akilliBaslik=aBaslik.checked; ayarKaydet(); };
 let silHazir=null;
 aSil.onclick=()=>{
